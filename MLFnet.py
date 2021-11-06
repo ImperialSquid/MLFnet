@@ -57,6 +57,25 @@ class MLFnet(nn.Module, ModelMixin):
             for layer in self.blocks[block]:
                 layer.requires_grad_(requires_grad=False)
 
+    def split_group(self, old_group, new_groups):
+        if old_group not in self.groups.values():
+            raise KeyError(f"Target group to split \"{old_group}\" either doesn't exist or is already split")
+        elif sorted(old_group) != sorted([task for group in new_groups for task in group]):
+            raise KeyError(f"There is a mismatch of tasks between the old and new groupings")
+
+        for new_group in new_groups:
+            for task in new_group:
+                self.groups[task] = new_group
+
+            self.paths[new_group] = self.paths[old_group] + ["_".join(new_group), ]
+
+            self.blocks["_".join(new_group)] = nn.ModuleList()
+
+        del self.paths[old_group]
+        self.finished.append("_".join(old_group))
+
+        self.compile_model()
+
     def compile_model(self):
         self.compiled_body = {group: nn.Sequential(*[nn.Sequential(*self.blocks[block]) for block in self.paths[group]])
                               for group in self.paths}
