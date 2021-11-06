@@ -30,6 +30,17 @@ class MLFnet(nn.Module, ModelMixin):
         x = {task: self.compiled[task](x) for task in self.groups}
         return x
 
+    def add_layer(self, target_group: Tuple[str, ...] = None, **kwargs):
+        target_block = "_".join(sorted(target_group))
+        if target_block not in self.blocks or target_block in self.finished:
+            raise KeyError(f"Target block \"{target_block}\" either doesn't exist or is finished training")
+
+        new_layer = getattr(import_module("torch.nn"), kwargs["type"])  # import and instantiate layers on the fly
+        layer_kwargs = {kw: kwargs[kw] for kw in kwargs if kw != "type"}
+        self.blocks[target_block].append(new_layer(**layer_kwargs))
+
+        self.compile_model()
+
     def compile_model(self):
         compiled_body = {group: nn.Sequential(*[nn.Sequential(*self.blocks[block]) for block in self.paths[group]])
                          for group in self.paths}
