@@ -23,12 +23,17 @@ class MLFnet(nn.Module, ModelMixin):
         for task in heads.keys():
             self.heads[task] = heads[task]
 
-        self.compiled = None
+        self.compiled_head = None
+        self.compiled_body = None
         self.compile_model()
 
     def forward(self, x):
-        x = {task: self.compiled[task](x) for task in self.groups}
-        return x
+        groups = {g: self.compiled_body[g](x) for g in self.paths}
+        out = {}
+        for group in groups:
+            for task in group:
+                out[task] = self.compiled_head[task](groups[group])
+        return out
 
     def add_layer(self, target_group: Optional[Tuple[str, ...]] = None, **kwargs):
         if target_group is not None:
@@ -53,12 +58,9 @@ class MLFnet(nn.Module, ModelMixin):
                 layer.requires_grad_(requires_grad=False)
 
     def compile_model(self):
-        compiled_body = {group: nn.Sequential(*[nn.Sequential(*self.blocks[block]) for block in self.paths[group]])
-                         for group in self.paths}
-        compiled_head = {task: nn.Sequential(*self.heads[task]) for task in self.heads}
-
-        self.compiled = {task: nn.Sequential(*[compiled_body[self.groups[task]], compiled_head[task]])
-                         for task in self.groups}
+        self.compiled_body = {group: nn.Sequential(*[nn.Sequential(*self.blocks[block]) for block in self.paths[group]])
+                              for group in self.paths}
+        self.compiled_head = {task: nn.Sequential(*self.heads[task]) for task in self.heads}
 
     def load_test_setup(self):
         self.tasks = ("a", "b", "c")
