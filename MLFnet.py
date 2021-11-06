@@ -47,6 +47,11 @@ class MLFnet(nn.Module, ModelMixin):
 
         self.compile_model()
 
+    def freeze_model(self):
+        for block in self.blocks:
+            for layer in self.blocks[block]:
+                layer.requires_grad_(requires_grad=False)
+
     def compile_model(self):
         compiled_body = {group: nn.Sequential(*[nn.Sequential(*self.blocks[block]) for block in self.paths[group]])
                          for group in self.paths}
