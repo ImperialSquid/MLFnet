@@ -1,10 +1,11 @@
-from copy import deepcopy
 from typing import Optional, Tuple, Dict
 
 from torch import nn
 
+from utils import ModelMixin
 
-class MLFnet(nn.Module):
+
+class MLFnet(nn.Module, ModelMixin):
     def __init__(self, tasks: Tuple[str, ...] = tuple(), heads: Optional[Dict[str, nn.Module]] = None):
         super().__init__()
         self.tasks = None
