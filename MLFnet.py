@@ -1,6 +1,7 @@
 from importlib import import_module
 from typing import Optional, Tuple, Dict
 
+import torch
 from torch import nn
 
 from utils import ModelMixin
@@ -123,16 +124,17 @@ def main():
                     **{"type": "Conv2d", "in_channels": 512, "out_channels": 1024, "kernel_size": (3, 3)})
     model.add_layer(target_group=None,
                     **{"type": "Conv2d", "in_channels": 1024, "out_channels": 1024, "kernel_size": (3, 3)})
-    model.add_layer(target_group=None,
+    model.add_layer(target_group=("a", "b"),
                     **{"type": "Conv2d", "in_channels": 1024, "out_channels": 2048, "kernel_size": (3, 3)})
-    model.add_layer(target_group=None,
+    model.add_layer(target_group=("a", "b"),
                     **{"type": "Conv2d", "in_channels": 2048, "out_channels": 4096, "kernel_size": (3, 3)})
     print(model)
     model(torch.zeros(1, 3, 96, 96))
 
     # print(model.frozen_states())
 
-    model.draw(torch.zeros(1, 3, 96, 96))
+    model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal")
+    model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal", verbose=True)
 
 
 if __name__ == "__main__":
