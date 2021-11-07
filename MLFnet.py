@@ -143,6 +143,15 @@ class MLFnet(nn.Module, ModelMixin):
         #     this is theoretically harmless to the main loop)
         # compare grads collected and return suggested regrouping  (maybe implement a few diff methods for grouping?)
 
+    def reset_heads(self, target_tasks: Optional[Tuple[str, ...]] = None):
+        if target_tasks is None:
+            target_tasks = self.tasks
+
+        for task in target_tasks:
+            for layer in self.heads[task]:
+                if hasattr(layer, 'reset_parameters'):
+                    layer.reset_parameters()
+
     def compile_model(self):
         # safe to use dict comprehension here since PyTorch is already aware of the Modules
         self.compiled_blocks = {block: nn.Sequential(*self.blocks[block]) for block in self.blocks}
