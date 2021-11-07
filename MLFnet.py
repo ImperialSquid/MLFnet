@@ -7,10 +7,13 @@ from utils import ModelMixin
 
 
 class MLFnet(nn.Module, ModelMixin):
-    def __init__(self, tasks: Tuple[str, ...] = tuple(), heads: Optional[Dict[str, nn.Module]] = None, debug=False):
+    def __init__(self, tasks: Tuple[str, ...] = tuple(), heads: Optional[Dict[str, nn.Module]] = None, device=None,
+                 debug=False):
         super().__init__()
         if debug:
             self.load_test_setup()
+
+        self.device = device
 
         self.tasks = tuple(sorted(tasks))  # stores a tuple of the task names
         self.groups = {task: self.tasks for task in self.tasks}  # maps task names to the group they belong to
@@ -64,14 +67,16 @@ class MLFnet(nn.Module, ModelMixin):
             if target_block not in self.blocks or target_block in self.finished:  # more helpful error to raise
                 raise KeyError(f"Target block \"{target_block}\" either doesn't exist or is finished training")
 
-        new_layer = getattr(import_module("torch.nn"), kwargs["type"])  # import and instantiate layers on the fly
+        layer = getattr(import_module("torch.nn"), kwargs["type"])  # import and instantiate layers on the fly
         layer_kwargs = {kw: kwargs[kw] for kw in kwargs if kw != "type"}
+        new_layer = layer(**layer_kwargs)
+        new_layer.to(self.device)
 
         if target_group is not None:  # add the new layer to the desired group
-            self.blocks[target_block].append(new_layer(**layer_kwargs))
+            self.blocks[target_block].append(new_layer)
         else:  # None is allowed when adding layers to every group (ie every block not in finished)
             for unfinished in [block for block in self.blocks if block not in self.finished]:
-                self.blocks[unfinished].append(new_layer(**layer_kwargs))
+                self.blocks[unfinished].append(new_layer)
 
         self.compile_model()  # recompile model to update the Sequentials
 
@@ -100,7 +105,7 @@ class MLFnet(nn.Module, ModelMixin):
 
         self.compile_model()  # recompile model
 
-    def assess_grouping(self, losses: Dict[str: nn.Module]):
+    def assess_grouping(self, losses: Dict[str, nn.Module]):
         raise NotImplementedError("Yet to add automated grouping suggestions")
         # gradients for each parameter in a model are stored in .grad (only after a loss backward pass)
         # for loss in losses
@@ -133,17 +138,28 @@ class MLFnet(nn.Module, ModelMixin):
 
 
 def main():
-    pass
-    # import torch
-    # model = MLFnet(tasks=("a", "b", "c"), heads=None)
-    # model.add_layer(target_group=None,
-    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
-    # model.add_layer(target_group=None,
-    #                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
-    # model.add_layer(target_group=None,
-    #                 **{"type": "Conv2d", "in_channels": 256, "out_channels": 512, "kernel_size": (3, 3)})
-    # model.split_group(old_group=("a", "b", "c"), new_groups=[("a", "b"), ("c",)])
-    # model.add_layer(target_group=None,
+
+
+# device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # use GPU if CUDA is available
+# print(device)
+# model = MLFnet(tasks=("a", "b", "c"), heads=None, device=device)
+# model.add_layer(target_group=None,
+#                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
+# model.add_layer(target_group=None,
+#                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
+# model(torch.zeros(1,3,96,96).cuda())
+# print(device)
+#
+# import torch
+# model = MLFnet(tasks=("a", "b", "c"), heads=None)
+# model.add_layer(target_group=None,
+#                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
+# model.add_layer(target_group=None,
+#                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
+# model.add_layer(target_group=None,
+#                 **{"type": "Conv2d", "in_channels": 256, "out_channels": 512, "kernel_size": (3, 3)})
+# model.split_group(old_group=("a", "b", "c"), new_groups=[("a", "b"), ("c",)])
+# model.add_layer(target_group=None,
     #                 **{"type": "Conv2d", "in_channels": 512, "out_channels": 1024, "kernel_size": (3, 3)})
     # model.add_layer(target_group=None,
     #                 **{"type": "Conv2d", "in_channels": 1024, "out_channels": 1024, "kernel_size": (3, 3)})
@@ -154,8 +170,9 @@ def main():
     # print(model)
     # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet")
     # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet", verbose=True)
-    #
-    # model = MLFnet(tasks=("a", "b", "c"), heads=None)
+#
+#
+# model = MLFnet(tasks=("a", "b", "c"), heads=None)
     # model.add_layer(target_group=None,
     #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
     # model.add_layer(target_group=None,
@@ -174,8 +191,9 @@ def main():
     # print(model)
     # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal")
     # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal", verbose=True)
-    #
-    # import string
+#
+#
+# import string
     # tasks = tuple(string.ascii_letters[:10])
     # model = MLFnet(tasks=tasks, heads=None)
     # model.add_layer(target_group=None,

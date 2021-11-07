@@ -1,2 +1,2 @@
-torch~=1.10.0
+torch==1.10.0+cu102
 hiddenlayer~=0.3
