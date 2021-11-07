@@ -63,8 +63,8 @@ class MLFnet(nn.Module, ModelMixin):
 
         self.compile_model()
 
-    def freeze_model(self):
-        for block in self.blocks:
+    def freeze_model(self, target_group: Optional[Tuple[str, ...]] = None):
+        for block in [b for b in self.blocks if b in self.paths[target_group]]:
             for layer in self.blocks[block]:
                 layer.requires_grad_(requires_grad=False)
 
