@@ -24,11 +24,22 @@ class MLFnet(nn.Module, ModelMixin):
             self.heads[task] = heads[task]
 
         self.compiled_head = None
-        self.compiled_body = None
+        self.compiled_blocks = None
         self.compile_model()
 
     def forward(self, x):
-        groups = {g: self.compiled_body[g](x) for g in self.paths}
+        groups = {}
+        block_results = {}
+        for group in self.paths:
+            groups[group] = x
+            for block in self.paths[group]:
+                if block in block_results:
+                    groups[group] = block_results[block]
+                else:
+                    result = self.compiled_blocks[block](groups[group])
+                    groups[group] = result
+                    block_results[block] = result
+
         out = {}
         for group in groups:
             for task in group:
@@ -77,8 +88,7 @@ class MLFnet(nn.Module, ModelMixin):
         self.compile_model()
 
     def compile_model(self):
-        self.compiled_body = {group: nn.Sequential(*[nn.Sequential(*self.blocks[block]) for block in self.paths[group]])
-                              for group in self.paths}
+        self.compiled_blocks = {block: nn.Sequential(*self.blocks[block]) for block in self.blocks}
         self.compiled_head = {task: nn.Sequential(*self.heads[task]) for task in self.heads}
 
     def load_test_setup(self):
