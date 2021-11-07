@@ -1,4 +1,4 @@
-class ModelMixin():
+class ModelMixin:
     def draw(self, input_tensor, filename=None, filetype="png", transforms="default", **options):
         import hiddenlayer as hl
         import os
