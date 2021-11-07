@@ -7,91 +7,106 @@ from utils import ModelMixin
 
 
 class MLFnet(nn.Module, ModelMixin):
-    def __init__(self, tasks: Tuple[str, ...] = tuple(), heads: Optional[Dict[str, nn.Module]] = None):
+    def __init__(self, tasks: Tuple[str, ...] = tuple(), heads: Optional[Dict[str, nn.Module]] = None, debug=False):
         super().__init__()
-        self.tasks = tuple(sorted(tasks))
-        self.groups = {task: self.tasks for task in self.tasks}
+        if debug:
+            self.load_test_setup()
+
+        self.tasks = tuple(sorted(tasks))  # stores a tuple of the task names
+        self.groups = {task: self.tasks for task in self.tasks}  # maps task names to the group they belong to
+        # maps group tuples to a list of the blocks they pass through (all tasks in a group share the same
+        # path but with separate heads)
         self.paths = {group: ["_".join(group)] for group in self.groups.values()}
 
+        # blocks maps block names to ModuleLists (names are derived from the names of the tasks that pass through them)
+        # ModuleDict and  ModuleList are used over builtins since they make PyTorch aware of any Module's existence
         self.blocks = nn.ModuleDict()
         self.blocks["_".join(self.tasks)] = nn.ModuleList()
-        self.finished = []
+        self.finished = []  # any block that has subsequent blocks is "finished" and shouldn't be added to
 
+        # if heads is not given or there is a mismatch in names default to just flattening
         if heads is None or sorted(heads.keys()) != sorted(self.tasks):
             heads = {task: nn.ModuleList([nn.Flatten()]) for task in self.tasks}
         self.heads = nn.ModuleDict()
         for task in heads.keys():
             self.heads[task] = heads[task]
 
+        # the compiled attrs store versions where the lists have been nn.Sequential-ised for simplicity later
         self.compiled_head = None
         self.compiled_blocks = None
         self.compile_model()
 
     def forward(self, x):
-        groups = {}
+        group_results = {}
+        # since each block sees one input and occurs once it's safe to cache the results
+        # this also saves on multiple passes for expensive blocks
         block_results = {}
-        for group in self.paths:
-            groups[group] = x
-            for block in self.paths[group]:
+        for group in self.paths:  # iter over each group so we take every possible path through
+            group_results[group] = x
+            for block in self.paths[group]:  # iter over each block in a path until they have all been appliedww
                 if block in block_results:
-                    groups[group] = block_results[block]
+                    group_results[group] = block_results[block]
                 else:
-                    result = self.compiled_blocks[block](groups[group])
-                    groups[group] = result
+                    result = self.compiled_blocks[block](group_results[group])
+                    group_results[group] = result
                     block_results[block] = result
 
         out = {}
-        for group in groups:
+        # now take each group result and pass it through it's associated head
+        for group in group_results:
             for task in group:
-                out[task] = self.compiled_head[task](groups[group])
+                out[task] = self.compiled_head[task](group_results[group])
         return out
 
     def add_layer(self, target_group: Optional[Tuple[str, ...]] = None, **kwargs):
         if target_group is not None:
             target_block = "_".join(sorted(target_group))
-            if target_block not in self.blocks or target_block in self.finished:
+            if target_block not in self.blocks or target_block in self.finished:  # more helpful error to raise
                 raise KeyError(f"Target block \"{target_block}\" either doesn't exist or is finished training")
 
         new_layer = getattr(import_module("torch.nn"), kwargs["type"])  # import and instantiate layers on the fly
         layer_kwargs = {kw: kwargs[kw] for kw in kwargs if kw != "type"}
 
-        if target_group is not None:
+        if target_group is not None:  # add the new layer to the desired group
             self.blocks[target_block].append(new_layer(**layer_kwargs))
-        else:
+        else:  # None is allowed when adding layers to every group (ie every block not in finished)
             for unfinished in [block for block in self.blocks if block not in self.finished]:
                 self.blocks[unfinished].append(new_layer(**layer_kwargs))
 
-        self.compile_model()
+        self.compile_model()  # recompile model to update the Sequentials
 
     def freeze_model(self, target_group: Optional[Tuple[str, ...]] = None):
+        # freeze every block in the specified group's path
         for block in [b for b in self.blocks if b in self.paths[target_group]]:
+            # PyCharm doesn't like self.blocks[block] here since it doesn't see ModuleLists as iterable (they are)
             for layer in self.blocks[block]:
                 layer.requires_grad_(requires_grad=False)
 
     def split_group(self, old_group, new_groups):
-        if old_group not in self.groups.values():
+        if old_group not in self.groups.values():  # do some checks to see if the group is legal
             raise KeyError(f"Target group to split \"{old_group}\" either doesn't exist or is already split")
         elif sorted(old_group) != sorted([task for group in new_groups for task in group]):
             raise KeyError(f"There is a mismatch of tasks between the old and new groupings")
 
         for new_group in new_groups:
             for task in new_group:
-                self.groups[task] = new_group
-
+                self.groups[task] = new_group  # reassign tasks to their new group
+            # update the path by adding the new block name
             self.paths[new_group] = self.paths[old_group] + ["_".join(new_group), ]
+            self.blocks["_".join(new_group)] = nn.ModuleList()  # create new block
 
-            self.blocks["_".join(new_group)] = nn.ModuleList()
+        del self.paths[old_group]  # make sure to delete the old group's path
+        self.finished.append("_".join(old_group))  # mark the block as finished so no more layers are added
 
-        del self.paths[old_group]
-        self.finished.append("_".join(old_group))
-
-        self.compile_model()
+        self.compile_model()  # recompile model
 
     def compile_model(self):
+        # safe to use dict comprehension here since PyTorch is already aware of the Modules
         self.compiled_blocks = {block: nn.Sequential(*self.blocks[block]) for block in self.blocks}
         self.compiled_head = {task: nn.Sequential(*self.heads[task]) for task in self.heads}
 
     def load_test_setup(self):
+        # just an example setup
         self.tasks = ("a", "b", "c")
         self.groups = {"a": ("a", "b"),
                        "b": ("a", "b"),
@@ -101,6 +116,9 @@ class MLFnet(nn.Module, ModelMixin):
         self.blocks = {"a_b_c": nn.ModuleList([nn.Flatten(), nn.Flatten()]),
                        "a_b": nn.ModuleList([nn.Flatten(), nn.Flatten(), nn.Flatten(), nn.Flatten()]),
                        "c": nn.ModuleList([nn.Flatten(), nn.Flatten(), nn.Flatten()])}
+        self.compiled_head = None
+        self.compiled_blocks = None
+        self.compile_model()
 
 
 def main():
