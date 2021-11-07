@@ -138,28 +138,27 @@ class MLFnet(nn.Module, ModelMixin):
 
 
 def main():
-
-
-# device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # use GPU if CUDA is available
-# print(device)
-# model = MLFnet(tasks=("a", "b", "c"), heads=None, device=device)
-# model.add_layer(target_group=None,
-#                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
-# model.add_layer(target_group=None,
-#                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
-# model(torch.zeros(1,3,96,96).cuda())
-# print(device)
-#
-# import torch
-# model = MLFnet(tasks=("a", "b", "c"), heads=None)
-# model.add_layer(target_group=None,
-#                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
-# model.add_layer(target_group=None,
-#                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
-# model.add_layer(target_group=None,
-#                 **{"type": "Conv2d", "in_channels": 256, "out_channels": 512, "kernel_size": (3, 3)})
-# model.split_group(old_group=("a", "b", "c"), new_groups=[("a", "b"), ("c",)])
-# model.add_layer(target_group=None,
+    pass
+    # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # use GPU if CUDA is available
+    # print(device)
+    # model = MLFnet(tasks=("a", "b", "c"), heads=None, device=device)
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
+    # model(torch.zeros(1,3,96,96).cuda())
+    # print(device)
+    #
+    # import torch
+    # model = MLFnet(tasks=("a", "b", "c"), heads=None)
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 256, "out_channels": 512, "kernel_size": (3, 3)})
+    # model.split_group(old_group=("a", "b", "c"), new_groups=[("a", "b"), ("c",)])
+    # model.add_layer(target_group=None,
     #                 **{"type": "Conv2d", "in_channels": 512, "out_channels": 1024, "kernel_size": (3, 3)})
     # model.add_layer(target_group=None,
     #                 **{"type": "Conv2d", "in_channels": 1024, "out_channels": 1024, "kernel_size": (3, 3)})
@@ -170,9 +169,9 @@ def main():
     # print(model)
     # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet")
     # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet", verbose=True)
-#
-#
-# model = MLFnet(tasks=("a", "b", "c"), heads=None)
+    #
+    #
+    # model = MLFnet(tasks=("a", "b", "c"), heads=None)
     # model.add_layer(target_group=None,
     #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
     # model.add_layer(target_group=None,
@@ -191,9 +190,9 @@ def main():
     # print(model)
     # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal")
     # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal", verbose=True)
-#
-#
-# import string
+    #
+    #
+    # import string
     # tasks = tuple(string.ascii_letters[:10])
     # model = MLFnet(tasks=tasks, heads=None)
     # model.add_layer(target_group=None,
@@ -211,6 +210,7 @@ def main():
     #
     # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetMany")
     # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetMany", verbose=True)
+    pass
 
 
 if __name__ == "__main__":
