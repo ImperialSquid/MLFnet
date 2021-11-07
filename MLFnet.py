@@ -1,7 +1,8 @@
 from importlib import import_module
 from typing import Optional, Tuple, Dict
 
-from torch import nn
+from torch import nn, concat
+from torch.nn.utils import parameters_to_vector
 
 from utils import ModelMixin
 
@@ -116,7 +117,22 @@ class MLFnet(nn.Module, ModelMixin):
         self.compile_model()  # recompile model
 
     def assess_grouping(self, losses: Dict[str, nn.Module]):
-        raise NotImplementedError("Yet to add automated grouping suggestions")
+        # raise NotImplementedError("Yet to add automated grouping suggestions")
+        frozen_states = self.frozen_states()
+        vectors = {}
+        self.zero_grad()
+        for task in losses:
+            losses[task].backwards()
+
+            modules = []
+            for layer in [l for l in sorted(frozen_states.keys()) if not frozen_states[l]]:
+                modules.append(parameters_to_vector(layer))
+            vectors[task] = concat(modules)
+
+            self.zero_grad()
+
+        print(vectors)
+
         # gradients for each parameter in a model are stored in .grad (only after a loss backward pass)
         # for loss in losses
         #     loss.backward() (to back prop the accumulated gradients)
