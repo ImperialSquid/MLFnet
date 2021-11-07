@@ -111,6 +111,7 @@ class MLFnet(nn.Module, ModelMixin):
         # for loss in losses
         #     loss.backward() (to back prop the accumulated gradients)
         #     collect .grads
+        #     use torch.nn.utils.parameters_to_vector() to flatten consistently
         #     use .zero_grad to clear gradients (zero_grad can set to 0 or None, compare different behaviour for each)
         #     (gradients only need to be backproped just before the optimiser step so
         #     this is theoretically harmless to the main loop)
