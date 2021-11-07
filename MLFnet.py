@@ -118,6 +118,26 @@ def main():
     #                 **{"type": "Conv2d", "in_channels": 512, "out_channels": 1024, "kernel_size": (3, 3)})
     # model.add_layer(target_group=None,
     #                 **{"type": "Conv2d", "in_channels": 1024, "out_channels": 1024, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 1024, "out_channels": 2048, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 2048, "out_channels": 4096, "kernel_size": (3, 3)})
+    # print(model)
+    # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet")
+    # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet", verbose=True)
+    #
+    # model = MLFnet(tasks=("a", "b", "c"), heads=None)
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 256, "out_channels": 512, "kernel_size": (3, 3)})
+    # model.split_group(old_group=("a", "b", "c"), new_groups=[("a", "b"), ("c",)])
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 512, "out_channels": 1024, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 1024, "out_channels": 1024, "kernel_size": (3, 3)})
     # model.add_layer(target_group=("a", "b"),
     #                 **{"type": "Conv2d", "in_channels": 1024, "out_channels": 2048, "kernel_size": (3, 3)})
     # model.add_layer(target_group=("a", "b"),
