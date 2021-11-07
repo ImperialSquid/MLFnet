@@ -69,16 +69,26 @@ class MLFnet(nn.Module, ModelMixin):
 
         layer = getattr(import_module("torch.nn"), kwargs["type"])  # import and instantiate layers on the fly
         layer_kwargs = {kw: kwargs[kw] for kw in kwargs if kw != "type"}
-        new_layer = layer(**layer_kwargs)
-        new_layer.to(self.device)
+
+        # need to keep track of newly added layers so they can be passed back and put into the optimiser
+        new_layers = []
 
         if target_group is not None:  # add the new layer to the desired group
+            new_layer = layer(**layer_kwargs)
+            new_layer.to(self.device)
             self.blocks[target_block].append(new_layer)
+            new_layers.append(new_layer)
         else:  # None is allowed when adding layers to every group (ie every block not in finished)
             for unfinished in [block for block in self.blocks if block not in self.finished]:
+                # new layers are instantiated inside the loop to prevent references to the same layer
+                new_layer = layer(**layer_kwargs)
+                new_layer.to(self.device)
                 self.blocks[unfinished].append(new_layer)
+                new_layers.append(new_layer)
 
         self.compile_model()  # recompile model to update the Sequentials
+
+        return new_layers
 
     def freeze_model(self, target_group: Optional[Tuple[str, ...]] = None):
         # freeze every block in the specified group's path
