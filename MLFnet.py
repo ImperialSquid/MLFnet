@@ -149,9 +149,11 @@ def main():
     # import string
     # tasks = tuple(string.ascii_letters[:10])
     # model = MLFnet(tasks=tasks, heads=None)
-    # model.add_layer(target_group=None, **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
     # model.split_group(old_group=tasks, new_groups=[tasks[:4], tasks[4:]])
-    # model.add_layer(target_group=None, **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
     # model.split_group(old_group=tasks[:4], new_groups=[tasks[:2], tasks[2:4]])
     # model.add_layer(target_group=tasks[:2],
     #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
