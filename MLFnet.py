@@ -100,6 +100,17 @@ class MLFnet(nn.Module, ModelMixin):
 
         self.compile_model()  # recompile model
 
+    def assess_grouping(self, losses: Dict[str: nn.Module]):
+        raise NotImplementedError("Yet to add automated grouping suggestions")
+        # gradients for each parameter in a model are stored in .grad (only after a loss backward pass)
+        # for loss in losses
+        #     loss.backward() (to back prop the accumulated gradients)
+        #     collect .grads
+        #     use .zero_grad to clear gradients (zero_grad can set to 0 or None, compare different behaviour for each)
+        #     (gradients only need to be backproped just before the optimiser step so
+        #     this is theoretically harmless to the main loop)
+        # compare grads collected and return suggested regrouping  (maybe implement a few diff methods for grouping?)
+
     def compile_model(self):
         # safe to use dict comprehension here since PyTorch is already aware of the Modules
         self.compiled_blocks = {block: nn.Sequential(*self.blocks[block]) for block in self.blocks}
