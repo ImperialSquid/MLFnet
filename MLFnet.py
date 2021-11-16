@@ -51,7 +51,7 @@ class MLFnet(nn.Module, ModelMixin):
         block_results = {}
         for group in self.paths:  # iter over each group so we take every possible path through
             group_results[group] = x
-            for block in self.paths[group]:  # iter over each block in a path until they have all been applied
+            for block in self.paths[group]:  # iter over each block in a path until they have all been appliedww
                 if block in block_results:
                     group_results[group] = block_results[block]
                 else:
@@ -133,7 +133,7 @@ class MLFnet(nn.Module, ModelMixin):
             losses[task].backwards()
 
             modules = []
-            for layer in [layer for layer in sorted(frozen_states.keys()) if not frozen_states[layer]]:
+            for layer in [l for l in sorted(frozen_states.keys()) if not frozen_states[l]]:
                 modules.append(parameters_to_vector(layer))
             vectors[task] = concat(modules)
 
