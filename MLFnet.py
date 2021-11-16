@@ -131,43 +131,18 @@ class MLFnet(nn.Module, ModelMixin):
             vectors[task] = concat(modules)
 
             self.zero_grad()
-        comparison_method = getattr(self, "_assess_grouping_" + method)
 
-        grouping = comparison_method(vectors=vectors, **kwargs)
-        return grouping
+        print(vectors)
 
-    def _assess_grouping_kmeans(self, vectors, **kwargs):
-        from sklearn.cluster import KMeans
-
-        groups = KMeans(**kwargs).fit(vectors)
-
-        if kwargs["debug"]:
-            print(f"{vectors=}")
-            print(f"{groups=}")
-
-        return groups
-
-    def _assess_grouping_dbscan(self, vectors, **kwargs):
-        from sklearn.cluster import DBSCAN
-
-        groups = DBSCAN(**kwargs).fit(vectors)
-
-        if kwargs["debug"]:
-            print(f"{vectors=}")
-            print(f"{groups=}")
-
-        return groups
-
-    def _assess_grouping_agglomerative_clustering(self, vectors, **kwargs):
-        from sklearn.cluster import FeatureAgglomeration
-
-        groups = FeatureAgglomeration(**kwargs).fit(vectors)
-
-        if kwargs["debug"]:
-            print(f"{vectors=}")
-            print(f"{groups=}")
-
-        return groups
+        # gradients for each parameter in a model are stored in .grad (only after a loss backward pass)
+        # for loss in losses
+        #     loss.backward() (to back prop the accumulated gradients)
+        #     collect .grads
+        #     use torch.nn.utils.parameters_to_vector() to flatten consistently
+        #     use .zero_grad to clear gradients (zero_grad can set to 0 or None, compare different behaviour for each)
+        #     (gradients only need to be backproped just before the optimiser step so
+        #     this is theoretically harmless to the main loop)
+        # compare grads collected and return suggested regrouping  (maybe implement a few diff methods for grouping?)
 
     def reset_heads(self, target_tasks: Optional[Tuple[str, ...]] = None):
         if target_tasks is None:
