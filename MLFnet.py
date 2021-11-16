@@ -87,6 +87,7 @@ class MLFnet(nn.Module, ModelMixin):
                 self.blocks[unfinished].append(new_layer)
                 new_layers.append(new_layer)
 
+        self.reset_heads(target_tasks=target_group)  # we don't want old heads affecting new layers so they are reset
         self.compile_model()  # recompile model to update the Sequentials
 
         return new_layers
