@@ -1,17 +1,13 @@
 from importlib import import_module
 from typing import Optional, Tuple, Dict
 
-import torchvision.datasets
 from torch import nn, concat
 from torch.nn.utils import parameters_to_vector
 
 from utils import ModelMixin
 
 
-# TODO Publish: formalised javadoc style documentation
-# TODO Publish: finish and double check type checking
 class MLFnet(nn.Module, ModelMixin):
-    # TODO Extras: allow a common backbone (eg pass in some pretrained body to skip retraining body before heads)
     def __init__(self, tasks: Tuple[str, ...] = tuple(), heads: Optional[Dict[str, nn.Module]] = None, device=None,
                  debug=False):
         super().__init__()
@@ -91,8 +87,6 @@ class MLFnet(nn.Module, ModelMixin):
                 self.blocks[unfinished].append(new_layer)
                 new_layers.append(new_layer)
 
-        # TODO Investigate: look into whether forcing a reset_head is always needed, this may be a temporary line and
-        #  it's up to the user to choose in later versions
         self.reset_heads(target_tasks=target_group)  # we don't want old heads affecting new layers so they are reset
         self.compile_model()  # recompile model to update the Sequentials
 
@@ -123,9 +117,8 @@ class MLFnet(nn.Module, ModelMixin):
 
         self.compile_model()  # recompile model
 
-    def assess_grouping(self, losses: Dict[str, nn.Module], method: str = "", **kwargs):
-        # TODO Extras: enforce only checking in task groups or super groups (eg if tasks are [(a,b),(c)], allow (a,b),
-        #  (c) and (a,b,c))
+    def assess_grouping(self, losses: Dict[str, nn.Module]):
+        # raise NotImplementedError("Yet to add automated grouping suggestions")
         frozen_states = self.frozen_states()
         vectors = {}
         self.zero_grad()
@@ -138,16 +131,11 @@ class MLFnet(nn.Module, ModelMixin):
             vectors[task] = concat(modules)
 
             self.zero_grad()
-
-        # TODO Publish: check self._assess_grouping_<method> exists, throw AttributionError otherwise
-        # TODO Publish: use inspect.signature to check signature (accepts vectors, kwargs and none other),
-        #  throw AttributionError otherwise
         comparison_method = getattr(self, "_assess_grouping_" + method)
 
         grouping = comparison_method(vectors=vectors, **kwargs)
         return grouping
 
-    # TODO Extras: add a version that tests all numbers of clusters and returns a dict?
     def _assess_grouping_kmeans(self, vectors, **kwargs):
         from sklearn.cluster import KMeans
 
@@ -159,7 +147,6 @@ class MLFnet(nn.Module, ModelMixin):
 
         return groups
 
-    # TODO Extras: add a version that tests all numbers of clusters and returns a dict?
     def _assess_grouping_dbscan(self, vectors, **kwargs):
         from sklearn.cluster import DBSCAN
 
@@ -212,68 +199,80 @@ class MLFnet(nn.Module, ModelMixin):
         self.compile_model()
 
 
-def example_case(case):
-    import torch
-    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # use GPU if CUDA is available
-    print(device)
-    if case in ["normal", "unequal"]:
-        model = MLFnet(tasks=("a", "b", "c"), heads=None)
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 256, "out_channels": 512, "kernel_size": (3, 3)})
-
-        model.split_group(old_group=("a", "b", "c"), new_groups=[("a", "b"), ("c",)])
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 512, "out_channels": 1024, "kernel_size": (3, 3)})
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 1024, "out_channels": 1024, "kernel_size": (3, 3)})
-
-        if case == "normal":
-            model.add_layer(target_group=None,
-                            **{"type": "Conv2d", "in_channels": 1024, "out_channels": 2048, "kernel_size": (3, 3)})
-            model.add_layer(target_group=None,
-                            **{"type": "Conv2d", "in_channels": 2048, "out_channels": 4096, "kernel_size": (3, 3)})
-            print(model)
-            model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet")
-            model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet", verbose=True)
-        elif case == "unequal":
-            model.add_layer(target_group=("a", "b"),
-                            **{"type": "Conv2d", "in_channels": 1024, "out_channels": 2048, "kernel_size": (3, 3)})
-            model.add_layer(target_group=("a", "b"),
-                            **{"type": "Conv2d", "in_channels": 2048, "out_channels": 4096, "kernel_size": (3, 3)})
-            print(model)
-            model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal")
-            model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal", verbose=True)
-    elif case == "many":
-        import string
-        tasks = tuple(string.ascii_letters[:10])
-        model = MLFnet(tasks=tasks, heads=None)
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
-
-        model.split_group(old_group=tasks, new_groups=[tasks[:4], tasks[4:]])
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
-
-        model.split_group(old_group=tasks[:4], new_groups=[tasks[:2], tasks[2:4]])
-        model.add_layer(target_group=tasks[:2],
-                        **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
-
-        model.split_group(old_group=tasks[4:], new_groups=[tasks[4:7], tasks[7:]])
-        model.add_layer(target_group=tasks[4:7],
-                        **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
-        print(model)
-
-        model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetMany")
-        model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetMany", verbose=True)
-
-
 def main():
-    train_data = torchvision.datasets.CelebA(root="data/celeba/train", split="train", target_type="attr", download=True)
-    test_data = torchvision.datasets.CelebA(root="data/celeba/test", split="test", target_type="attr", download=True)
+    pass
+    # device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # use GPU if CUDA is available
+    # print(device)
+    # model = MLFnet(tasks=("a", "b", "c"), heads=None, device=device)
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
+    # model(torch.zeros(1,3,96,96).cuda())
+    # print(device)
+    #
+    # import torch
+    # model = MLFnet(tasks=("a", "b", "c"), heads=None)
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 256, "out_channels": 512, "kernel_size": (3, 3)})
+    # model.split_group(old_group=("a", "b", "c"), new_groups=[("a", "b"), ("c",)])
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 512, "out_channels": 1024, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 1024, "out_channels": 1024, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 1024, "out_channels": 2048, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 2048, "out_channels": 4096, "kernel_size": (3, 3)})
+    # print(model)
+    # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet")
+    # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet", verbose=True)
+    #
+    #
+    # model = MLFnet(tasks=("a", "b", "c"), heads=None)
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 256, "out_channels": 512, "kernel_size": (3, 3)})
+    # model.split_group(old_group=("a", "b", "c"), new_groups=[("a", "b"), ("c",)])
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 512, "out_channels": 1024, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 1024, "out_channels": 1024, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=("a", "b"),
+    #                 **{"type": "Conv2d", "in_channels": 1024, "out_channels": 2048, "kernel_size": (3, 3)})
+    # model.add_layer(target_group=("a", "b"),
+    #                 **{"type": "Conv2d", "in_channels": 2048, "out_channels": 4096, "kernel_size": (3, 3)})
+    # print(model)
+    # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal")
+    # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal", verbose=True)
+    #
+    #
+    # import string
+    # tasks = tuple(string.ascii_letters[:10])
+    # model = MLFnet(tasks=tasks, heads=None)
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
+    # model.split_group(old_group=tasks, new_groups=[tasks[:4], tasks[4:]])
+    # model.add_layer(target_group=None,
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
+    # model.split_group(old_group=tasks[:4], new_groups=[tasks[:2], tasks[2:4]])
+    # model.add_layer(target_group=tasks[:2],
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
+    # model.split_group(old_group=tasks[4:], new_groups=[tasks[4:7], tasks[7:]])
+    # model.add_layer(target_group=tasks[4:7],
+    #                 **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
+    # print(model)
+    #
+    # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetMany")
+    # model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetMany", verbose=True)
+    pass
 
 
 if __name__ == "__main__":
