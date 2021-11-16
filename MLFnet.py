@@ -7,7 +7,10 @@ from torch.nn.utils import parameters_to_vector
 from utils import ModelMixin
 
 
+# TODO Publish: formalised javadoc style documentation
+# TODO Publish: finish and double check type checking
 class MLFnet(nn.Module, ModelMixin):
+    # TODO Extras: allow a common backbone (eg pass in some pretrained body to skip retraining body before heads)
     def __init__(self, tasks: Tuple[str, ...] = tuple(), heads: Optional[Dict[str, nn.Module]] = None, device=None,
                  debug=False):
         super().__init__()
@@ -47,7 +50,7 @@ class MLFnet(nn.Module, ModelMixin):
         block_results = {}
         for group in self.paths:  # iter over each group so we take every possible path through
             group_results[group] = x
-            for block in self.paths[group]:  # iter over each block in a path until they have all been appliedww
+            for block in self.paths[group]:  # iter over each block in a path until they have all been applied
                 if block in block_results:
                     group_results[group] = block_results[block]
                 else:
@@ -87,6 +90,8 @@ class MLFnet(nn.Module, ModelMixin):
                 self.blocks[unfinished].append(new_layer)
                 new_layers.append(new_layer)
 
+        # TODO Investigate: look into whether forcing a reset_head is always needed, this may be a temporary line and
+        #  it's up to the user to choose in later versions
         self.reset_heads(target_tasks=target_group)  # we don't want old heads affecting new layers so they are reset
         self.compile_model()  # recompile model to update the Sequentials
 
@@ -118,7 +123,8 @@ class MLFnet(nn.Module, ModelMixin):
         self.compile_model()  # recompile model
 
     def assess_grouping(self, losses: Dict[str, nn.Module], method: str = "", **kwargs):
-        # raise NotImplementedError("Yet to add automated grouping suggestions")
+        # TODO Extras: enforce only checking in task groups or super groups (eg if tasks are [(a,b),(c)], allow (a,b),
+        #  (c) and (a,b,c))
         frozen_states = self.frozen_states()
         vectors = {}
         self.zero_grad()
@@ -126,16 +132,21 @@ class MLFnet(nn.Module, ModelMixin):
             losses[task].backwards()
 
             modules = []
-            for layer in [l for l in sorted(frozen_states.keys()) if not frozen_states[l]]:
+            for layer in [layer for layer in sorted(frozen_states.keys()) if not frozen_states[layer]]:
                 modules.append(parameters_to_vector(layer))
             vectors[task] = concat(modules)
 
             self.zero_grad()
+
+        # TODO Publish: check self._assess_grouping_<method> exists, throw AttributionError otherwise
+        # TODO Publish: use inspect.signature to check signature (accepts vectors, kwargs and none other),
+        #  throw AttributionError otherwise
         comparison_method = getattr(self, "_assess_grouping_" + method)
 
         grouping = comparison_method(vectors=vectors, **kwargs)
         return grouping
 
+    # TODO Extras: add a version that tests all numbers of clusters and returns a dict?
     def _assess_grouping_kmeans(self, vectors, **kwargs):
         from sklearn.cluster import KMeans
 
@@ -147,6 +158,7 @@ class MLFnet(nn.Module, ModelMixin):
 
         return groups
 
+    # TODO Extras: add a version that tests all numbers of clusters and returns a dict?
     def _assess_grouping_dbscan(self, vectors, **kwargs):
         from sklearn.cluster import DBSCAN
 
