@@ -122,6 +122,14 @@ class MLFnet(nn.Module, ModelMixin):
 
         self.compile_model()  # recompile model
 
+    def frozen_states(self):
+        layers = {}
+        for p in self.named_parameters():
+            name = ".".join(p[0].split(".")[:-1])
+            layers[name] = layers.get(name, []) + [p[1].requires_grad]
+        layers = {l: not any(layers[l]) for l in layers}
+        return layers
+
     def assess_grouping(self, losses: Dict[str, nn.Module], method: str = "", **kwargs):
         # TODO Extras: enforce only checking in task groups or super groups (eg if tasks are [(a,b),(c)], allow (a,b),
         #  (c) and (a,b,c))
