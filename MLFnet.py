@@ -109,7 +109,7 @@ class MLFnet(nn.Module, ModelMixin):
 
     def freeze_model(self, target_group: Optional[Tuple[str, ...]] = None):
         # freeze every block in the specified group's path
-        for block in [b for b in self.blocks if b in self.paths[target_group]]:
+        for block in [b for b in self.blocks if target_group is None or b in self.paths[target_group]]:
             # PyCharm doesn't like self.blocks[block] here since it doesn't see ModuleLists as iterable (they are)
             for layer in self.blocks[block]:
                 layer.requires_grad_(requires_grad=False)
