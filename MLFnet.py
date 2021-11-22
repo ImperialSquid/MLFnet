@@ -136,10 +136,10 @@ class MLFnet(nn.Module, ModelMixin):
 
         self.compile_model()  # recompile model
 
-    def frozen_states(self):
+    def frozen_states(self):  # fetches a dict of layers and whether they are frozen (ie is .requires_grad True?)
         layers = {}
-        for p in self.named_parameters():
-            name = ".".join(p[0].split(".")[:-1])
+        for p in self.named_parameters():  # iter over layers
+            name = ".".join(p[0].split(".")[:-1])  # extract out the name
             layers[name] = layers.get(name, []) + [p[1].requires_grad]
         layers = {l: not any(layers[l]) for l in layers}
         return layers
