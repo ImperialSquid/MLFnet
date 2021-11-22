@@ -1,5 +1,5 @@
 from importlib import import_module
-from typing import Optional, Tuple, Dict
+from typing import Optional, Tuple, Dict, Type
 
 from torch import nn, concat
 from torch.nn.utils import parameters_to_vector
@@ -10,14 +10,17 @@ from utils import ModelMixin
 # TODO Publish: formalised javadoc style documentation
 # TODO Publish: finish and double check type checking
 class MLFnet(nn.Module, ModelMixin):
-    # TODO Extras: allow a common backbone (eg pass in some pretrained body to skip retraining body before heads)
-    def __init__(self, tasks: Tuple[str, ...] = tuple(), heads: Optional[Dict[str, nn.Module]] = None, device=None,
-                 debug=False):
+    def __init__(self, tasks: Tuple[str, ...] = tuple(), heads: Optional[Dict[str, Type[nn.Module]]] = None,
+                 backbone: Optional[Type[nn.Module]] = None, device=None, debug=False):
         super().__init__()
         if debug:
             self.load_test_setup()
 
         self.device = device
+
+        if backbone is None:
+            backbone = nn.Identity()  # if no backbone is given just use an Identity layer to change nothing
+        self.backbone = backbone
 
         self.tasks = tuple(sorted(tasks))  # stores a tuple of the task names
         self.groups = {task: self.tasks for task in self.tasks}  # maps task names to the group they belong to
@@ -44,17 +47,23 @@ class MLFnet(nn.Module, ModelMixin):
         self.compile_model()
 
     def forward(self, x):
+        x = self.backbone(x)  # pass data through shared backbone before heads
+
+        # group_results stores the output for each group's path before heads
         group_results = {}
-        # since each block sees one input and occurs once it's safe to cache the results
-        # this also saves on multiple passes for expensive blocks
+        # block results stores the output of each block
         block_results = {}
+        # since each block sees exactly one input it's safe to cache the results
+        # this also saves on multiple passes for expensive blocks
         for group in self.paths:  # iter over each group so we take every possible path through
             group_results[group] = x
-            for block in self.paths[group]:  # iter over each block in a path until they have all been applied
+            # iter over each block in a path until they have all been applied (or fetched from cache)
+            for block in self.paths[group]:
                 if block in block_results:
                     group_results[group] = block_results[block]
                 else:
                     result = self.compiled_blocks[block](group_results[group])
+                    # update group results as we go through, this will be overwritten until the last block
                     group_results[group] = result
                     block_results[block] = result
 
