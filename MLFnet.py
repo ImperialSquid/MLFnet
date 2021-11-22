@@ -77,14 +77,18 @@ class MLFnet(nn.Module, ModelMixin):
 
     def add_layer(self, target_group: Optional[Tuple[str, ...]] = None, **kwargs):
         if target_group is not None:
-            target_block = "_".join(sorted(target_group))
+            target_block = "_".join(sorted(target_group))  # derive block name by joining task names with underscores
             if target_block not in self.blocks or target_block in self.finished:  # more helpful error to raise
-                raise KeyError(f"Target block \"{target_block}\" either doesn't exist or is finished training")
+                raise KeyError(f"Target block \"{target_block}\" either doesn't exist or is finished training (blocks "
+                               f"halfway along a path are considered finished to ensure consistent behaviour in "
+                               f"later blocks)")
 
         layer = getattr(import_module("torch.nn"), kwargs["type"])  # import and instantiate layers on the fly
         layer_kwargs = {kw: kwargs[kw] for kw in kwargs if kw != "type"}
 
         # need to keep track of newly added layers so they can be passed back and put into the optimiser
+        # optimiser won't update layers it doesn't know about so the results of this should be passed to
+        # optimiser.add_param_group()
         new_layers = []
 
         if target_group is not None:  # add the new layer to the desired group
