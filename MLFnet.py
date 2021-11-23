@@ -35,12 +35,14 @@ class MLFnet(nn.Module, ModelMixin):
         self.finished = []  # any block that has subsequent blocks is "finished" and shouldn't be added to
 
         # default to an Identity head for any not provided
-        self.heads = {task: nn.ModuleList([nn.Identity()]) for task in self.tasks}
+        self.heads = nn.ModuleDict()
+        for task in tasks:
+            self.heads[task] = nn.ModuleList([nn.Identity().to(self.device)])
 
         if heads is not None:
             for task in self.tasks:
                 if task in heads.keys():  # if a task is given a head, reassign to that instead
-                    self.heads[task] = heads[task]
+                    self.heads[task] = heads[task].to(self.device)
 
         # the compiled attrs store versions where the lists have been nn.Sequential-ised for simplicity later
         self.compiled_head = None
