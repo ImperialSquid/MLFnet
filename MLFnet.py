@@ -1,4 +1,5 @@
 from importlib import import_module
+from inspect import signature
 from typing import Optional, Tuple, Dict, Type
 
 from torch import nn, concat
@@ -120,7 +121,7 @@ class MLFnet(nn.Module, ModelMixin):
             for layer in self.blocks[block]:
                 layer.requires_grad_(requires_grad=False)
 
-    def split_group(self, old_group, new_groups):
+    def split_group(self, old_group: Tuple[str, ...], new_groups: Tuple[Tuple[str, ...], ...]):
         if old_group not in self.groups.values():  # do some checks to see if the group is legal
             raise KeyError(f"Target group to split \"{old_group}\" either doesn't exist or is already split")
         elif sorted(old_group) != sorted([task for group in new_groups for task in group]):
@@ -146,12 +147,20 @@ class MLFnet(nn.Module, ModelMixin):
         layers = {l: not any(layers[l]) for l in layers}
         return layers
 
-    def assess_grouping(self, losses: Dict[str, nn.Module], method: str = "", **kwargs):
+    def assess_grouping(self, losses: Dict[str, Type[nn.Module]], method: str = "", **kwargs):
         # TODO Extras: enforce only checking in task groups or super groups (eg if tasks are [(a,b),(c)], allow (a,b),
-        #  (c) and (a,b,c))
+        #  (c) and (a,b,c) but not (a,c))
+        # TODO Extras: allow "auto" as method, look at number of losses given and go from there?
+        if method == "":
+            good_methods = ", ".join([func.replace("_assess_grouping_", "") for func in dir(self)
+                                      if func.startswith("_assess_grouping_")])
+            raise ValueError(f"Grouping method not provided, must be one of: {good_methods}")
+
         frozen_states = self.frozen_states()
         vectors = {}
         self.zero_grad()
+        # TODO temporary code, needs redoing to add checks (layer is used by all tasks,
+        #  layer is not in a finished block, etc)
         for task in losses:
             losses[task].backwards()
 
@@ -162,10 +171,14 @@ class MLFnet(nn.Module, ModelMixin):
 
             self.zero_grad()
 
-        # TODO Publish: check self._assess_grouping_<method> exists, throw AttributionError otherwise
-        # TODO Publish: use inspect.signature to check signature (accepts vectors, kwargs and none other),
-        #  throw AttributionError otherwise
-        comparison_method = getattr(self, "_assess_grouping_" + method)
+        comparison_method = getattr(self, "_assess_grouping_" + method, None)
+        if comparison_method is None:  # check grouping method exists, provide useful error if not
+            good_methods = ", ".join([func.replace("_assess_grouping_", "") for func in dir(self)
+                                      if func.startswith("_assess_grouping_")])
+            raise AttributeError(f"Grouping method {method} doesn't exist, use one of: {good_methods}")
+        if str(signature(comparison_method)) != "(vectors, **kwargs)":
+            # check signature will work if user has implemented their own method
+            raise AttributeError("Grouping method signature looks wrong (should be (vectors, **kwargs))")
 
         grouping = comparison_method(vectors=vectors, **kwargs)
         return grouping
@@ -206,16 +219,17 @@ class MLFnet(nn.Module, ModelMixin):
         return groups
 
     def reset_heads(self, target_tasks: Optional[Tuple[str, ...]] = None):
-        if target_tasks is None:
+        if target_tasks is None:  # if tasks is None, reset all
             target_tasks = self.tasks
 
         for task in target_tasks:
             for layer in self.heads[task]:
                 if hasattr(layer, 'reset_parameters'):
-                    layer.reset_parameters()
+                    layer.reset_parameters()  # use built-in reset_parameter from pytorch
 
     def compile_model(self):
-        # safe to use dict comprehension here since PyTorch is already aware of the Modules
+        # safe to use dict comprehension here since PyTorch is already aware of the layers
+        # compiling has no effect on running speed, it just improves code readability elsewhere
         self.compiled_blocks = {block: nn.Sequential(*self.blocks[block]) for block in self.blocks}
         self.compiled_head = {task: nn.Sequential(*self.heads[task]) for task in self.heads}
 
