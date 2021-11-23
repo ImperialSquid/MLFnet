@@ -151,6 +151,7 @@ class MLFnet(nn.Module, ModelMixin):
         # TODO Extras: enforce only checking in task groups or super groups (eg if tasks are [(a,b),(c)], allow (a,b),
         #  (c) and (a,b,c) but not (a,c))
         # TODO Extras: allow "auto" as method, look at number of losses given and go from there?
+        # TODO Extras: Add optional preprocessing (eg PCA?)
         if method == "":
             good_methods = ", ".join([func.replace("_assess_grouping_", "") for func in dir(self)
                                       if func.startswith("_assess_grouping_")])
@@ -183,41 +184,54 @@ class MLFnet(nn.Module, ModelMixin):
             raise AttributeError("Grouping method signature looks wrong (should be (vectors, **kwargs))")
 
         grouping = comparison_method(vectors=vectors, **kwargs)
+        # TODO reformat built-ins to return groups in a manner that can be fed straight back in (0,0,1) -> ((a,b),(c,))
         return grouping
 
     # TODO Extras: add a version that tests all numbers of clusters and returns a dict?
     def _assess_grouping_kmeans(self, vectors, **kwargs):
+        # use kmeans from scikit-learn, options are left to the use to define
         from sklearn.cluster import KMeans
 
-        groups = KMeans(**kwargs).fit(vectors)
+        debug = kwargs["debug"]
+        kwargs.pop("debug")
 
-        if kwargs["debug"]:
+        vs = [vectors[key].tolist() for key in vectors]
+        groups = KMeans(**kwargs).fit(vs).labels_
+
+        if debug:
             print(f"{vectors=}")
             print(f"{groups=}")
-
         return groups
 
     # TODO Extras: add a version that tests all numbers of clusters and returns a dict?
     def _assess_grouping_dbscan(self, vectors, **kwargs):
+        # use DBSCAN from scikit-learn, options are left to the use to define
         from sklearn.cluster import DBSCAN
 
-        groups = DBSCAN(**kwargs).fit(vectors)
+        debug = kwargs["debug"]
+        kwargs.pop("debug")
 
-        if kwargs["debug"]:
+        vs = [vectors[key].tolist() for key in vectors]
+        groups = DBSCAN(**kwargs).fit(vs).labels_
+
+        if debug:
             print(f"{vectors=}")
             print(f"{groups=}")
-
         return groups
 
     def _assess_grouping_agglomerative_clustering(self, vectors, **kwargs):
-        from sklearn.cluster import FeatureAgglomeration
+        # use hierarchical clustering from scikit-learn, options are left to the user to define
+        from sklearn.cluster import AgglomerativeClustering
 
-        groups = FeatureAgglomeration(**kwargs).fit(vectors)
+        debug = kwargs["debug"]
+        kwargs.pop("debug")
 
-        if kwargs["debug"]:
+        vs = [vectors[key].tolist() for key in vectors]
+        groups = AgglomerativeClustering(**kwargs).fit(vs).labels_
+
+        if debug:
             print(f"{vectors=}")
             print(f"{groups=}")
-
         return groups
 
     def reset_heads(self, target_tasks: Optional[Tuple[str, ...]] = None):
