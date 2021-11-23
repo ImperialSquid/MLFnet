@@ -162,7 +162,8 @@ class MLFnet(nn.Module, ModelMixin):
         # TODO temporary code, needs redoing to add checks (layer is used by all tasks,
         #  layer is not in a finished block, etc)
         for task in losses:
-            losses[task].backwards()
+            # retain_graph is required since we are backward-ing multiple losses over the same layers separately
+            losses[task].backward(retain_graph=True)
 
             modules = []
             for layer in [layer for layer in sorted(frozen_states.keys()) if not frozen_states[layer]]:
