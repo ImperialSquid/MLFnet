@@ -278,7 +278,7 @@ def example_case(case):
         model.add_layer(target_group=None,
                         **{"type": "Conv2d", "in_channels": 256, "out_channels": 512, "kernel_size": (3, 3)})
 
-        model.split_group(old_group=("a", "b", "c"), new_groups=[("a", "b"), ("c",)])
+        model.split_group(old_group=("a", "b", "c"), new_groups=(("a", "b"), ("c",)))
         model.add_layer(target_group=None,
                         **{"type": "Conv2d", "in_channels": 512, "out_channels": 1024, "kernel_size": (3, 3)})
         model.add_layer(target_group=None,
@@ -307,15 +307,15 @@ def example_case(case):
         model.add_layer(target_group=None,
                         **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
 
-        model.split_group(old_group=tasks, new_groups=[tasks[:4], tasks[4:]])
+        model.split_group(old_group=tasks, new_groups=(tasks[:4], tasks[4:]))
         model.add_layer(target_group=None,
                         **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
 
-        model.split_group(old_group=tasks[:4], new_groups=[tasks[:2], tasks[2:4]])
+        model.split_group(old_group=tasks[:4], new_groups=(tasks[:2], tasks[2:4]))
         model.add_layer(target_group=tasks[:2],
                         **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
 
-        model.split_group(old_group=tasks[4:], new_groups=[tasks[4:7], tasks[7:]])
+        model.split_group(old_group=tasks[4:], new_groups=(tasks[4:7], tasks[7:]))
         model.add_layer(target_group=tasks[4:7],
                         **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
         print(model)
