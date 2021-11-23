@@ -75,10 +75,10 @@ class MultimonDataset(MLFnetDataset):
 
             for line in lines:
                 splits = line.split(",")
-                data[splits[0]] = [zeros(len(type_dict)).scatter_(0, tensor([type_dict[s] for s
-                                                                             in splits[1:3]]), 1),
-                                   zeros(len(gen_dict)).scatter_(0, tensor([gen_dict[splits[3]]]), 1),
-                                   tensor([int(splits[4].strip() == "True")]).float()]
+                data[splits[0]] = {"Type": zeros(len(type_dict)).scatter_(0, tensor([type_dict[s] for s
+                                                                                     in splits[1:3]]), 1),
+                                   "Gen": zeros(len(gen_dict)).scatter_(0, tensor([gen_dict[splits[3]]]), 1),
+                                   "Shiny": tensor([int(splits[4].strip() == "True")]).float()}
         return data
 
 
