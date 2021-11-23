@@ -166,8 +166,9 @@ class MLFnet(nn.Module, ModelMixin):
             losses[task].backward(retain_graph=True)
 
             modules = []
-            for layer in [layer for layer in sorted(frozen_states.keys()) if not frozen_states[layer]]:
-                modules.append(parameters_to_vector(layer))
+            for name, param in self.named_parameters():
+                if param.requires_grad:
+                    modules.append(parameters_to_vector(param))
             vectors[task] = concat(modules)
 
             self.zero_grad()
