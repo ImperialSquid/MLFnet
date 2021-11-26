@@ -85,27 +85,38 @@ class MLFnet(nn.Module, ModelMixin):
                 raise KeyError(f"Target block \"{target_block}\" either doesn't exist or is finished training (blocks "
                                f"halfway along a path are considered finished to ensure consistent behaviour in "
                                f"later blocks)")
-
-        layer = getattr(import_module("torch.nn"), kwargs["type"])  # import and instantiate layers on the fly
-        layer_kwargs = {kw: kwargs[kw] for kw in kwargs if kw != "type"}
+        if kwargs["type"] == "custom" and target_group is None:
+            raise ValueError("Cannot add custom blocks when target_group is None. Custom blocks are given already "
+                             "instantiated, adding to multiple groups would effectively recombine them.")
 
         # need to keep track of newly added layers so they can be passed back and put into the optimiser
         # optimiser won't update layers it doesn't know about so the results of this should be passed to
         # optimiser.add_param_group()
         new_layers = []
 
-        if target_group is not None:  # add the new layer to the desired group
-            new_layer = layer(**layer_kwargs)
-            new_layer.to(self.device)
+        if kwargs["type"] == "custom":  # add custom layers through "custom" type
+            # this is aimed at more complex Seqentials of layers which are to be repeated in future
+            # WARNING passing the same object in multiple times will get around regrouping checks,
+            # this is on the user to ensure
+            # TODO Extras: safety checks that new layer is a proper type to be added
+            # TODO Extras: consider avoiding issue of accidental regroups using deepcopy?
+            new_layer = kwargs["custom"].to(self.device)  # get custom block and move to device
             self.blocks[target_block].append(new_layer)
-            new_layers.append(new_layer)
-        else:  # None is allowed when adding layers to every group (ie every block not in finished)
-            for unfinished in [block for block in self.blocks if block not in self.finished]:
-                # new layers are instantiated inside the loop to prevent references to the same layer
-                new_layer = layer(**layer_kwargs)
-                new_layer.to(self.device)
-                self.blocks[unfinished].append(new_layer)
+            new_layers.append(new_layer)  # new block should be returned as usual
+        else:
+            layer = getattr(import_module("torch.nn"), kwargs["type"])  # import and instantiate layers on the fly
+            layer_kwargs = {kw: kwargs[kw] for kw in kwargs if kw != "type"}
+
+            if target_group is not None:  # add the new layer to the desired group
+                new_layer = layer(**layer_kwargs).to(self.device)
+                self.blocks[target_block].append(new_layer)
                 new_layers.append(new_layer)
+            else:  # None is allowed when adding layers to every group (ie every block not in finished)
+                for unfinished in [block for block in self.blocks if block not in self.finished]:
+                    # new layers are instantiated inside the loop to prevent references to the same layer
+                    new_layer = layer(**layer_kwargs).to(self.device)
+                    self.blocks[unfinished].append(new_layer)
+                    new_layers.append(new_layer)
 
         # TODO Investigate: look into whether forcing a reset_head is always needed, this may be a temporary line and
         #  it's up to the user to choose in later versions
