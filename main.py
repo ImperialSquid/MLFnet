@@ -1,6 +1,7 @@
 import torch
 from torch import tensor, optim, topk, round
 from torch.nn import BCELoss, Sequential, Flatten, LazyLinear, Linear, Sigmoid, ReLU, BCEWithLogitsLoss
+from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, RandomVerticalFlip, RandomAffine
 
@@ -125,7 +126,8 @@ def main():
               {"type": "Conv2d", "in_channels": 48, "out_channels": 48, "kernel_size": (3, 3), "stride": (1, 1),
                "padding": 0, "padding_mode": "zeros"}]
 
-    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)  # TODO adaptive lr, big jumps when first starting
+    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)  # TODO adaptive lr, big jumps when first starting
+    scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.25, verbose=True)
 
     epochs = len(layers) * 3
     stats_history = {"train-type-all": [], "train-type-any": [], "train-gen": [], "train-shiny": [],
@@ -141,6 +143,7 @@ def main():
         if epoch % 3 == 0 and epoch > 0:
             model.freeze_model()
             model.add_layer(None, **layers[epoch // 3 - 1])
+            scheduler.step()
 
         # using an internal loop for training/testing we avoid duplicating code
         for phase in ["train", "test", "validate"]:
