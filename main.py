@@ -134,7 +134,7 @@ def main():
         stats = dict()
         if epoch % 3 == 0 and epoch > 0:
             model.freeze_model()
-            model.add_layer(None, **layers[epoch // 3])
+            model.add_layer(None, **layers[epoch // 3 - 1])
 
         # using an internal loop for training/testing we avoid duplicating code
         for phase in ["train", "test", "validate"]:
