@@ -180,7 +180,7 @@ class MLFnet(nn.Module, ModelMixin):
             for name, param in self.named_parameters():
                 if param.requires_grad and "blocks" in name:  # filter frozen params and those not in the blocks
                     modules.append(parameters_to_vector(param))
-            vectors[task] = concat(modules)
+            vectors[task] = concat(modules).tolist()
 
             self.zero_grad()
 
@@ -205,11 +205,11 @@ class MLFnet(nn.Module, ModelMixin):
         debug = kwargs["debug"]
         kwargs.pop("debug")
 
-        vs = [vectors[key].tolist() for key in vectors]
+        vs = [vectors[key] for key in vectors]
         groups = KMeans(**kwargs).fit(vs).labels_
 
         if debug:
-            print(f"{vectors=}")
+            print("Vectors:\n" + "\n".join([key + "\t" + str(vectors[key]) for key in vectors]))
             print(f"{groups=}")
         return groups
 
@@ -221,11 +221,11 @@ class MLFnet(nn.Module, ModelMixin):
         debug = kwargs["debug"]
         kwargs.pop("debug")
 
-        vs = [vectors[key].tolist() for key in vectors]
+        vs = [vectors[key] for key in vectors]
         groups = DBSCAN(**kwargs).fit(vs).labels_
 
         if debug:
-            print(f"{vectors=}")
+            print("Vectors:\n" + "\n".join([key + "\t" + str(vectors[key]) for key in vectors]))
             print(f"{groups=}")
         return groups
 
@@ -236,11 +236,11 @@ class MLFnet(nn.Module, ModelMixin):
         debug = kwargs["debug"]
         kwargs.pop("debug")
 
-        vs = [vectors[key].tolist() for key in vectors]
+        vs = [vectors[key] for key in vectors]
         groups = AgglomerativeClustering(**kwargs).fit(vs).labels_
 
         if debug:
-            print(f"{vectors=}")
+            print("Vectors:\n" + "\n".join([key + "\t" + str(vectors[key]) for key in vectors]))
             print(f"{groups=}")
         return groups
 
