@@ -1,3 +1,4 @@
+from copy import deepcopy
 from importlib import import_module
 from inspect import signature
 from typing import Optional, Tuple, Dict, Type
@@ -29,25 +30,29 @@ class MLFnet(nn.Module, ModelMixin):
         # path but with separate heads)
         self.paths = {group: ["_".join(group)] for group in self.groups.values()}
 
-        # blocks maps block names to ModuleLists (names are derived from the names of the tasks that pass through them)
-        # ModuleDict and  ModuleList are used over builtins since they make PyTorch aware of any Module's existence
-        self.blocks = nn.ModuleDict()
-        self.blocks["_".join(self.tasks)] = nn.ModuleList()
+        # blocks maps block names to lists (names are derived from the names of the tasks that pass through them)
+        self.blocks = dict()
+        self.blocks["_".join(self.tasks)] = list()
         self.finished = []  # any block that has subsequent blocks is "finished" and shouldn't be added to
 
         # default to an Identity head for any not provided
-        self.heads = nn.ModuleDict()
+        self.heads = dict()
         for task in tasks:
-            self.heads[task] = nn.ModuleList([nn.Identity().to(self.device)])
-
+            self.heads[task] = [nn.Identity().to(self.device)]
         if heads is not None:
             for task in self.tasks:
                 if task in heads.keys():  # if a task is given a head, reassign to that instead
                     self.heads[task] = heads[task].to(self.device)
 
+        # original_heads stores the heads in their given state, when resetting they will be copied back out
+        # this is required since a lot of usages of the heads use pytorch's Lazy layers which lose their laziness after
+        # the first run, to preserve this laziness they are stored when lazy and copied back out each time heads reset
+        self.original_heads = deepcopy(self.heads)
+
         # the compiled attrs store versions where the lists have been nn.Sequential-ised for simplicity later
-        self.compiled_head = None
-        self.compiled_blocks = None
+        # ModuleDict used over builtins since they make PyTorch aware of any Module's existence
+        self.compiled_heads = nn.ModuleDict()  # these should not be overwritten now made as it will mess with PyTorch
+        self.compiled_blocks = nn.ModuleDict()
         self.compile_model()
 
     def forward(self, x):
@@ -75,7 +80,7 @@ class MLFnet(nn.Module, ModelMixin):
         # now take each group result and pass it through it's associated head
         for group in group_results:
             for task in group:
-                out[task] = self.compiled_head[task](group_results[group])
+                out[task] = self.compiled_heads[task](group_results[group])
         return out
 
     def add_layer(self, target_group: Optional[Tuple[str, ...]] = None, **kwargs):
@@ -128,7 +133,6 @@ class MLFnet(nn.Module, ModelMixin):
     def freeze_model(self, target_group: Optional[Tuple[str, ...]] = None):
         # freeze every block in the specified group's path
         for block in [b for b in self.blocks if target_group is None or b in self.paths[target_group]]:
-            # PyCharm doesn't like self.blocks[block] here since it doesn't see ModuleLists as iterable (they are)
             for layer in self.blocks[block]:
                 layer.requires_grad_(requires_grad=False)
 
@@ -144,7 +148,7 @@ class MLFnet(nn.Module, ModelMixin):
                 self.groups[task] = new_group  # reassign tasks to their new group
             # update the path by adding the new block name
             self.paths[new_group] = self.paths[old_group] + ["_".join(new_group), ]
-            self.blocks["_".join(new_group)] = nn.ModuleList()  # create new block
+            self.blocks["_".join(new_group)] = list()  # create new block
 
         del self.paths[old_group]  # make sure to delete the old group's path
         self.finished.append("_".join(old_group))  # mark the block as finished so no more layers are added
@@ -249,15 +253,15 @@ class MLFnet(nn.Module, ModelMixin):
             target_tasks = self.tasks
 
         for task in target_tasks:
-            for layer in self.heads[task]:
-                if hasattr(layer, 'reset_parameters'):
-                    layer.reset_parameters()  # use built-in reset_parameter from pytorch
+            self.heads[task] = deepcopy(self.original_heads[task])
 
     def compile_model(self):
         # safe to use dict comprehension here since PyTorch is already aware of the layers
         # compiling has no effect on running speed, it just improves code readability elsewhere
-        self.compiled_blocks = {block: nn.Sequential(*self.blocks[block]) for block in self.blocks}
-        self.compiled_head = {task: nn.Sequential(*self.heads[task]) for task in self.heads}
+        for block in self.blocks:
+            self.compiled_blocks[block] = nn.Sequential(*self.blocks[block])
+        for head in self.heads:
+            self.compiled_heads[head] = nn.Sequential(*self.heads[head])
 
     def load_test_setup(self):
         # just an example setup
@@ -267,11 +271,11 @@ class MLFnet(nn.Module, ModelMixin):
                        "c": ("c",)}
         self.paths = {("a", "b"): ["a_b_c", "a_b"],
                       ("c",): ["a_b_c", "c"]}
-        self.blocks = {"a_b_c": nn.ModuleList([nn.Flatten(), nn.Flatten()]),
-                       "a_b": nn.ModuleList([nn.Flatten(), nn.Flatten(), nn.Flatten(), nn.Flatten()]),
-                       "c": nn.ModuleList([nn.Flatten(), nn.Flatten(), nn.Flatten()])}
-        self.compiled_head = None
-        self.compiled_blocks = None
+        self.blocks = {"a_b_c": [nn.Flatten(), nn.Flatten()],
+                       "a_b": [nn.Flatten(), nn.Flatten(), nn.Flatten(), nn.Flatten()],
+                       "c": [nn.Flatten(), nn.Flatten(), nn.Flatten()]}
+        self.compiled_heads = nn.ModuleDict()
+        self.compiled_blocks = nn.ModuleDict()
         self.compile_model()
 
 
