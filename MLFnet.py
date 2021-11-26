@@ -128,6 +128,7 @@ class MLFnet(nn.Module, ModelMixin):
             raise KeyError(f"There is a mismatch of tasks between the old and new groupings")
 
         for new_group in new_groups:
+            new_group = sorted(new_group)
             for task in new_group:
                 self.groups[task] = new_group  # reassign tasks to their new group
             # update the path by adding the new block name
@@ -148,20 +149,18 @@ class MLFnet(nn.Module, ModelMixin):
         return layers
 
     def assess_grouping(self, losses: Dict[str, Type[nn.Module]], method: str = "", **kwargs):
-        # TODO Extras: enforce only checking in task groups or super groups (eg if tasks are [(a,b),(c)], allow (a,b),
-        #  (c) and (a,b,c) but not (a,c))
         # TODO Extras: allow "auto" as method, look at number of losses given and go from there?
         # TODO Extras: Add optional preprocessing (eg PCA?)
+        if sorted(losses.keys()) not in self.groups.values():
+            raise ValueError(f"Given group {losses.keys()} is not appropriate for assessing. Can only assess "
+                             f"currently grouped tasks.")
         if method == "":
             good_methods = ", ".join([func.replace("_assess_grouping_", "") for func in dir(self)
                                       if func.startswith("_assess_grouping_")])
             raise ValueError(f"Grouping method not provided, must be one of: {good_methods}")
 
-        frozen_states = self.frozen_states()
         vectors = {}
         self.zero_grad()
-        # TODO temporary code, needs redoing to add checks (layer is used by all tasks,
-        #  layer is not in a finished block, etc)
         for task in losses:
             # retain_graph is required since we are backward-ing multiple losses over the same layers separately
             losses[task].backward(retain_graph=True)
