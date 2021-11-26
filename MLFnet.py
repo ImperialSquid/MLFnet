@@ -162,7 +162,7 @@ class MLFnet(nn.Module, ModelMixin):
     def assess_grouping(self, losses: Dict[str, Type[nn.Module]], method: str = "", **kwargs):
         # TODO Extras: allow "auto" as method, look at number of losses given and go from there?
         # TODO Extras: Add optional preprocessing (eg PCA?)
-        if sorted(losses.keys()) not in self.groups.values():
+        if tuple(sorted(losses.keys())) not in self.groups.values():
             raise ValueError(f"Given group {losses.keys()} is not appropriate for assessing. Can only assess "
                              f"currently grouped tasks.")
         if method == "":
