@@ -130,6 +130,12 @@ def main():
     epochs = len(layers) * 3
     stats_history = {"train-type-all": [], "train-type-any": [], "train-gen": [], "train-shiny": [],
                      "test-type-all": [], "test-type-any": [], "test-gen": [], "test-shiny": []}
+    out_para = ("Epoch {epoch}/{epochs}\n"
+                "Train -- Acc Type(All):{train-type-all:.4%} | Type(Any):{train-type-any:.4%} | "
+                "Gen:{train-gen:.4%} | Shiny:{train-shiny:.4%}\n"
+                "Test  -- Acc Type(All):{test-type-all:.4%} | Type(Any):{test-type-any:.4%} | "
+                "Gen:{test-gen:.4%} | Shiny:{test-shiny:.4%}"
+                )
     for epoch in range(epochs):
         stats = dict()
         if epoch % 3 == 0 and epoch > 0:
@@ -206,13 +212,7 @@ def main():
             stats_history[stat] = stats_history.get(stat, []) + [stats[stat]]
 
         # Print results per epoch
-        print("Epoch {}/{}".format(epoch + 1, epochs) +
-              "\nTrain -- Acc Type(All):{train-type-all:.4%} | Type(Any):{train-type-any:.4%} |".format(
-                  **stats) +
-              " Gen:{train-gen:.4%} | Shiny:{train-shiny:.4%}".format(**stats) +
-              "\nTest  -- Acc Type(All):{test-type-all:.4%} | Type(Any):{test-type-any:.4%} |".format(
-                  **stats) +
-              " Gen:{test-gen:.4%} | Shiny:{test-shiny:.4%}".format(**stats))
+        print(out_para.format(epoch=epoch + 1, epochs=epochs, **stats))
 
 
 if __name__ == "__main__":
