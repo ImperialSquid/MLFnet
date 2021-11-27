@@ -255,8 +255,6 @@ class MLFnet(nn.Module, ModelMixin):
         for task in target_tasks:
             self.heads[task] = deepcopy(self.original_heads[task])
 
-        self.compile_model()
-
     def compile_model(self):
         # safe to use dict comprehension here since PyTorch is already aware of the layers
         # compiling has no effect on running speed, it just improves code readability elsewhere
