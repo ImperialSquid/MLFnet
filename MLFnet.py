@@ -45,6 +45,8 @@ class MLFnet(nn.Module, ModelMixin):
                 if task in heads.keys():  # if a task is given a head, reassign to that instead
                     self.heads[task] = heads[task].to(self.device)
 
+        self.update_vectors = dict()
+
         # the compiled attrs store versions where the lists have been nn.Sequential-ised for simplicity later
         # ModuleDict and  ModuleList are used over builtins since they make PyTorch aware of any Module's existence
         self._compiled_heads = nn.ModuleDict()
@@ -159,18 +161,7 @@ class MLFnet(nn.Module, ModelMixin):
         layers = {l: not any(layers[l]) for l in layers}
         return layers
 
-    def assess_grouping(self, losses: Dict[str, Type[nn.Module]], method: str = "", **kwargs):
-        # TODO Extras: allow "auto" as method, look at number of losses given and go from there?
-        # TODO Extras: Add optional preprocessing (eg PCA?)
-        if tuple(sorted(losses.keys())) not in self.groups.values():
-            raise ValueError(f"Given group {losses.keys()} is not appropriate for assessing. Can only assess "
-                             f"currently grouped tasks.")
-        if method == "":
-            good_methods = ", ".join([func.replace("_assess_grouping_", "") for func in dir(self)
-                                      if func.startswith("_assess_grouping_")])
-            raise ValueError(f"Grouping method not provided, must be one of: {good_methods}")
-
-        vectors = {}
+    def collect_weight_updates(self, losses: Dict[str, Type[nn.Module]]):
         self.zero_grad()
         for task in losses:
             # retain_graph is required since we are backward-ing multiple losses over the same layers separately
@@ -179,10 +170,21 @@ class MLFnet(nn.Module, ModelMixin):
             modules = []
             for name, param in self.named_parameters():
                 if param.requires_grad and "blocks" in name:  # filter frozen params and those not in the blocks
-                    modules.append(parameters_to_vector(param))
-            vectors[task] = concat(modules).tolist()
+                    modules.append(parameters_to_vector(param.grad))
+            self.update_vectors[task] = self.update_vectors.get(task, list()), + concat(modules).tolist()
 
             self.zero_grad()
+
+    def assess_grouping(self, group: Tuple[str, ...], method: str = "", **kwargs):
+        # TODO Extras: allow "auto" as method, look at number of losses given and go from there?
+        # TODO Extras: Add optional preprocessing (eg PCA?)
+        if tuple(sorted(group)) not in self.groups.values():
+            raise ValueError(f"Given group {group} is not appropriate for assessing. Can only assess "
+                             f"currently grouped tasks.")
+        if method == "":
+            good_methods = ", ".join([func.replace("_assess_grouping_", "") for func in dir(self)
+                                      if func.startswith("_assess_grouping_")])
+            raise ValueError(f"Grouping method not provided, must be one of: {good_methods}")
 
         comparison_method = getattr(self, "_assess_grouping_" + method, None)
         if comparison_method is None:  # check grouping method exists, provide useful error if not
@@ -193,9 +195,11 @@ class MLFnet(nn.Module, ModelMixin):
             # check signature will work if user has implemented their own method
             raise AttributeError("Grouping method signature looks wrong (should be (vectors, **kwargs))")
 
-        grouping = comparison_method(vectors=vectors, **kwargs)
+        raise NotImplementedError("Have not finished reformatting code to allow for grouping assessment")
+        # grouping = comparison_method(vectors= XYZ , **kwargs)
         # TODO reformat built-ins to return groups in a manner that can be fed straight back in (0,0,1) -> ((a,b),(c,))
-        return grouping
+        # self.update_vectors = dict()
+        # return grouping
 
     # TODO Extras: add a version that tests all numbers of clusters and returns a dict?
     def _assess_grouping_kmeans(self, vectors, **kwargs):

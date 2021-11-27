@@ -179,7 +179,7 @@ def main():
                 else:  # if validating also check grouping of tasks (and do branches etc)
                     preds = model(data)
                     ls = {head: losses[head](preds[head], labels[head]) for head in ["Type", "Gen", "Shiny"]}
-                    model.assess_grouping(method="agglomerative_clustering", losses=ls, debug=True)
+                    model.collect_weight_updates(losses=ls)
 
                 # ACCURACY
                 # TODO try more advanced metrics f1 etc?
