@@ -51,8 +51,8 @@ class MLFnet(nn.Module, ModelMixin):
 
         # the compiled attrs store versions where the lists have been nn.Sequential-ised for simplicity later
         # ModuleDict used over builtins since they make PyTorch aware of any Module's existence
-        self._compiled_heads = nn.ModuleDict()  # these should not be overwritten now made as it will mess with PyTorch
-        self._compiled_blocks = nn.ModuleDict()
+        self.compiled_heads = nn.ModuleDict()  # these should not be overwritten now made as it will mess with PyTorch
+        self.compiled_blocks = nn.ModuleDict()
         self.compile_model()
 
     def forward(self, x):
@@ -71,7 +71,7 @@ class MLFnet(nn.Module, ModelMixin):
                 if block in block_results:
                     group_results[group] = block_results[block]
                 else:
-                    result = self._compiled_blocks[block](group_results[group])
+                    result = self.compiled_blocks[block](group_results[group])
                     # update group results as we go through, this will be overwritten until the last block
                     group_results[group] = result
                     block_results[block] = result
@@ -80,7 +80,7 @@ class MLFnet(nn.Module, ModelMixin):
         # now take each group result and pass it through it's associated head
         for group in group_results:
             for task in group:
-                out[task] = self._compiled_heads[task](group_results[group])
+                out[task] = self.compiled_heads[task](group_results[group])
         return out
 
     def add_layer(self, target_group: Optional[Tuple[str, ...]] = None, **kwargs):
@@ -259,9 +259,9 @@ class MLFnet(nn.Module, ModelMixin):
         # safe to use dict comprehension here since PyTorch is already aware of the layers
         # compiling has no effect on running speed, it just improves code readability elsewhere
         for block in self.blocks:
-            self._compiled_blocks[block] = nn.Sequential(*self.blocks[block])
+            self.compiled_blocks[block] = nn.Sequential(*self.blocks[block])
         for head in self.heads:
-            self._compiled_heads[head] = nn.Sequential(*self.heads[head])
+            self.compiled_heads[head] = nn.Sequential(*self.heads[head])
 
     def load_test_setup(self):
         # just an example setup
@@ -274,8 +274,8 @@ class MLFnet(nn.Module, ModelMixin):
         self.blocks = {"a_b_c": [nn.Flatten(), nn.Flatten()],
                        "a_b": [nn.Flatten(), nn.Flatten(), nn.Flatten(), nn.Flatten()],
                        "c": [nn.Flatten(), nn.Flatten(), nn.Flatten()]}
-        self._compiled_heads = nn.ModuleDict()
-        self._compiled_blocks = nn.ModuleDict()
+        self.compiled_heads = nn.ModuleDict()
+        self.compiled_blocks = nn.ModuleDict()
         self.compile_model()
 
 
