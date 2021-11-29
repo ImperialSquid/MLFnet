@@ -171,7 +171,7 @@ class MLFnet(nn.Module, ModelMixin):
             for name, param in self.named_parameters():
                 if param.requires_grad and "blocks" in name:  # filter frozen params and those not in the blocks
                     modules.append(parameters_to_vector(param.grad))
-            self.update_vectors[task] = self.update_vectors.get(task, list()), + concat(modules).tolist()
+            self.update_vectors[task] = self.update_vectors.get(task, list()), + [concat(modules).tolist()]
 
             self.zero_grad()
 
