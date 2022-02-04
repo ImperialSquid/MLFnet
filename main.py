@@ -28,15 +28,19 @@ def get_context_parts(context, device, batch_size):
                               RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
 
     if context == "celeba":
+        load_fraction = 0.5
         train_dataset = CelebADataset(data_file=f"./data/{context}/labels.txt", key_mask=partitions["train"],
                                       img_path=f"./data/{context}/data", device=device, no_mask=False,
-                                      random_transforms=2, random_transforms_list=random_transforms_list)
+                                      random_transforms=2, random_transforms_list=random_transforms_list,
+                                      load_fraction=load_fraction)
         test_dataset = CelebADataset(data_file=f"./data/{context}/labels.txt", key_mask=partitions["test"],
                                      img_path=f"./data/{context}/data", device=device, no_mask=False,
-                                     random_transforms=2, random_transforms_list=random_transforms_list)
+                                     random_transforms=2, random_transforms_list=random_transforms_list,
+                                     load_fraction=load_fraction)
         valid_dataset = CelebADataset(data_file=f"./data/{context}/labels.txt", key_mask=partitions["valid"],
                                       img_path=f"./data/{context}/data", device=device, no_mask=False,
-                                      random_transforms=2, random_transforms_list=random_transforms_list)
+                                      random_transforms=2, random_transforms_list=random_transforms_list,
+                                      load_fraction=load_fraction)
 
         tasks = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", "Bags_Under_Eyes", "Bald",
                  "Bangs", "Big_Lips", "Big_Nose", "Black_Hair", "Blond_Hair", "Blurry", "Brown_Hair",
@@ -107,7 +111,7 @@ def main():
     print(f"{device=}")
 
     batch_size = 32
-    train_dataloader, test_dataloader, valid_dataloader, heads, losses = get_context_parts("multimon", device,
+    train_dataloader, test_dataloader, valid_dataloader, heads, losses = get_context_parts("celeba", device,
                                                                                            batch_size)
 
     model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device)

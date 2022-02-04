@@ -84,10 +84,11 @@ class MultimonDataset(MLFnetDataset):
 
 class CelebADataset(MLFnetDataset):
     def __init__(self, data_file, key_mask, img_path, device, no_mask=False, random_transforms=0,
-                 random_transforms_list=None):
+                 random_transforms_list=None, load_fraction=1):
         # TODO add on the fly index masking to enable k fold
         super().__init__(data_file, key_mask, img_path, device, no_mask, random_transforms, random_transforms_list)
 
+        key_mask = key_mask[:int(len(key_mask) * load_fraction)]
         full_data = self.parse_datafile(data_file)  # loads full dataset
         # uses enumerate to assign ids for filtering by index mask
         self.data = {key: full_data[key] for key in full_data if key in key_mask or no_mask}
