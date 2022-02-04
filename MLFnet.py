@@ -106,17 +106,14 @@ class MLFnet(nn.Module, ModelMixin):
             self.blocks[target_block].append(new_layer)
             new_layers.append(new_layer)  # new block should be returned as usual
         else:
-            layer = getattr(import_module("torch.nn"), kwargs["type"])  # import and instantiate layers on the fly
-            layer_kwargs = {kw: kwargs[kw] for kw in kwargs if kw != "type"}
-
             if target_group is not None:  # add the new layer to the desired group
-                new_layer = layer(**layer_kwargs).to(self.device)
+                new_layer = self._layer_from_dict(layer_dict=kwargs)
                 self.blocks[target_block].append(new_layer)
                 new_layers.append(new_layer)
             else:  # None is allowed when adding layers to every group (ie every block not in finished)
                 for unfinished in [block for block in self.blocks if block not in self.finished]:
                     # new layers are instantiated inside the loop to prevent references to the same layer
-                    new_layer = layer(**layer_kwargs).to(self.device)
+                    new_layer = self._layer_from_dict(layer_dict=kwargs)
                     self.blocks[unfinished].append(new_layer)
                     new_layers.append(new_layer)
 
@@ -182,6 +179,16 @@ class MLFnet(nn.Module, ModelMixin):
             for layer in self.heads[task]:
                 if hasattr(layer, 'reset_parameters'):
                     layer.reset_parameters()  # use built-in reset_parameter from pytorch
+
+    def _layer_from_dict(self, layer_dict: Dict[str, str] = None):
+        if layer_dict is None:
+            raise AttributeError("No dict of layer parameters given")
+
+        layer = getattr(import_module("torch.nn"), layer_dict["type"])  # import and instantiate layers on the fly
+        layer_dict = {kw: layer_dict[kw] for kw in layer_dict if kw != "type"}
+        new_layer = layer(**layer_dict).to(self.device)
+
+        return new_layer
 
     def compile_model(self):
         # safe to use dict comprehension here since PyTorch is already aware of the layers
