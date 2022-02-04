@@ -34,15 +34,10 @@ class MLFnet(nn.Module, ModelMixin):
         self.blocks["_".join(self.tasks)] = list()
         self.finished = []  # any block that has subsequent blocks is "finished" and shouldn't be added to
 
-        # default to an Identity head for any not provided
+        # store head dicts and set to Identity layer if non existent
+        self.head_dicts = {t: heads.get(t, [{"type": "Identity"}]) for t in self.tasks}
         self.heads = dict()
-        for task in tasks:
-            self.heads[task] = [nn.Identity().to(self.device)]
-
-        if heads is not None:
-            for task in self.tasks:
-                if task in heads.keys():  # if a task is given a head, reassign to that instead
-                    self.heads[task] = heads[task].to(self.device)
+        self.reset_heads()
 
         self.update_vectors = dict()
 
@@ -176,9 +171,9 @@ class MLFnet(nn.Module, ModelMixin):
             target_tasks = self.tasks
 
         for task in target_tasks:
-            for layer in self.heads[task]:
-                if hasattr(layer, 'reset_parameters'):
-                    layer.reset_parameters()  # use built-in reset_parameter from pytorch
+            self.heads[task] = list()
+            for layer in self.head_dicts[task]:
+                self.heads[task].append(self._layer_from_dict(layer))
 
     def _layer_from_dict(self, layer_dict: Dict[str, str] = None):
         if layer_dict is None:

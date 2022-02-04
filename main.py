@@ -76,19 +76,19 @@ def get_context_parts(context, device, batch_size):
                                         key_mask=partitions["valid"], img_path=f".\\data\\{context}\\data",
                                         random_transforms=2, random_transforms_list=random_transforms_list)
 
-        heads = {"Type": Sequential(Flatten(),
-                                    LazyLinear(out_features=1024), ReLU(),
-                                    Linear(in_features=1024, out_features=1024), ReLU(),
-                                    Linear(in_features=1024, out_features=len(type_counts))),
-                 "Gen": Sequential(Flatten(),
-                                   LazyLinear(out_features=1024), ReLU(),
-                                   Linear(in_features=1024, out_features=1024), ReLU(),
-                                   Linear(in_features=1024, out_features=len(gen_counts))),
-                 "Shiny": Sequential(Flatten(),
-                                     LazyLinear(out_features=1024), ReLU(),
-                                     Linear(in_features=1024, out_features=1024), ReLU(),
-                                     Linear(in_features=1024, out_features=1024), ReLU(),
-                                     Linear(in_features=1024, out_features=1), Sigmoid())}
+        heads = {"Type": [{"type": "Flatten"},
+                          {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
+                          {"type": "Linear", "in_features": 1024, "out_features": 1024}, {"type": "ReLU"},
+                          {"type": "Linear", "in_features": 1024, "out_features": len(type_counts)}],
+                 "Gen": [{"type": "Flatten"},
+                         {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
+                         {"type": "Linear", "in_features": 1024, "out_features": 1024}, {"type": "ReLU"},
+                         {"type": "Linear", "in_features": 1024, "out_features": len(gen_counts)}],
+                 "Shiny": [{"type": "Flatten"},
+                           {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
+                           {"type": "Linear", "in_features": 1024, "out_features": 1024}, {"type": "ReLU"},
+                           {"type": "Linear", "in_features": 1024, "out_features": 1024}, {"type": "ReLU"},
+                           {"type": "Linear", "in_features": 1024, "out_features": 1}, {"type": "Sigmoid"}]}
         losses = {"Type": BCEWithLogitsLoss(pos_weight=tensor([type_counts[t] / sum(type_counts.values())
                                                                for t in type_counts])).to(device),
                   "Gen": BCEWithLogitsLoss(pos_weight=tensor([gen_counts[g] / sum(gen_counts.values())
