@@ -1,6 +1,7 @@
-torch~=1.10.0+cu102
 hiddenlayer~=0.3
 sklearn~=0.0
 scikit-learn~=1.0.1
-torchvision~=0.11.1+cu102
 matplotlib~=3.4.3
+tqdm~=4.62.3
+torch~=1.10.2+cu113
+torchvision~=0.11.3+cu113
