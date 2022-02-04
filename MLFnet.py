@@ -1,5 +1,4 @@
 from importlib import import_module
-from inspect import signature
 from typing import Optional, Tuple, Dict, Type
 
 from torch import nn, concat
@@ -171,82 +170,9 @@ class MLFnet(nn.Module, ModelMixin):
             for name, param in self.named_parameters():
                 if param.requires_grad and "blocks" in name:  # filter frozen params and those not in the blocks
                     modules.append(parameters_to_vector(param.grad))
-            self.update_vectors[task] = self.update_vectors.get(task, list()), + [concat(modules).tolist()]
+            self.update_vectors[task] = self.update_vectors.get(task, list()) + [concat(modules).tolist()]
 
             self.zero_grad()
-
-    def assess_grouping(self, group: Tuple[str, ...], method: str = "", **kwargs):
-        # TODO Extras: allow "auto" as method, look at number of losses given and go from there?
-        # TODO Extras: Add optional preprocessing (eg PCA?)
-        if tuple(sorted(group)) not in self.groups.values():
-            raise ValueError(f"Given group {group} is not appropriate for assessing. Can only assess "
-                             f"currently grouped tasks.")
-        if method == "":
-            good_methods = ", ".join([func.replace("_assess_grouping_", "") for func in dir(self)
-                                      if func.startswith("_assess_grouping_")])
-            raise ValueError(f"Grouping method not provided, must be one of: {good_methods}")
-
-        comparison_method = getattr(self, "_assess_grouping_" + method, None)
-        if comparison_method is None:  # check grouping method exists, provide useful error if not
-            good_methods = ", ".join([func.replace("_assess_grouping_", "") for func in dir(self)
-                                      if func.startswith("_assess_grouping_")])
-            raise AttributeError(f"Grouping method {method} doesn't exist, use one of: {good_methods}")
-        if str(signature(comparison_method)) != "(vectors, **kwargs)":
-            # check signature will work if user has implemented their own method
-            raise AttributeError("Grouping method signature looks wrong (should be (vectors, **kwargs))")
-
-        raise NotImplementedError("Have not finished reformatting code to allow for grouping assessment")
-        # grouping = comparison_method(vectors= XYZ , **kwargs)
-        # TODO reformat built-ins to return groups in a manner that can be fed straight back in (0,0,1) -> ((a,b),(c,))
-        # self.update_vectors = dict()
-        # return grouping
-
-    # TODO Extras: add a version that tests all numbers of clusters and returns a dict?
-    def _assess_grouping_kmeans(self, vectors, **kwargs):
-        # use kmeans from scikit-learn, options are left to the use to define
-        from sklearn.cluster import KMeans
-
-        debug = kwargs["debug"]
-        kwargs.pop("debug")
-
-        vs = [vectors[key] for key in vectors]
-        groups = KMeans(**kwargs).fit(vs).labels_
-
-        if debug:
-            print("Vectors:\n" + "\n".join([key + "\t" + str(vectors[key]) for key in vectors]))
-            print(f"{groups=}")
-        return groups
-
-    # TODO Extras: add a version that tests all numbers of clusters and returns a dict?
-    def _assess_grouping_dbscan(self, vectors, **kwargs):
-        # use DBSCAN from scikit-learn, options are left to the use to define
-        from sklearn.cluster import DBSCAN
-
-        debug = kwargs["debug"]
-        kwargs.pop("debug")
-
-        vs = [vectors[key] for key in vectors]
-        groups = DBSCAN(**kwargs).fit(vs).labels_
-
-        if debug:
-            print("Vectors:\n" + "\n".join([key + "\t" + str(vectors[key]) for key in vectors]))
-            print(f"{groups=}")
-        return groups
-
-    def _assess_grouping_agglomerative_clustering(self, vectors, **kwargs):
-        # use hierarchical clustering from scikit-learn, options are left to the user to define
-        from sklearn.cluster import AgglomerativeClustering
-
-        debug = kwargs["debug"]
-        kwargs.pop("debug")
-
-        vs = [vectors[key] for key in vectors]
-        groups = AgglomerativeClustering(**kwargs).fit(vs).labels_
-
-        if debug:
-            print("Vectors:\n" + "\n".join([key + "\t" + str(vectors[key]) for key in vectors]))
-            print(f"{groups=}")
-        return groups
 
     def reset_heads(self, target_tasks: Optional[Tuple[str, ...]] = None):
         if target_tasks is None:  # if tasks is None, reset all
