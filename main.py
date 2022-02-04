@@ -1,6 +1,6 @@
 import torch
 from torch import tensor, optim, topk, round
-from torch.nn import BCELoss, Sequential, Flatten, LazyLinear, Linear, Sigmoid, ReLU, BCEWithLogitsLoss
+from torch.nn import BCELoss, BCEWithLogitsLoss
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, RandomVerticalFlip, RandomAffine
@@ -46,11 +46,11 @@ def get_context_parts(context, device, batch_size):
                  "Rosy_Cheeks", "Sideburns", "Smiling", "Straight_Hair", "Wavy_Hair", "Wearing_Earrings",
                  "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", "Wearing_Necktie", "Young"]
 
-        heads = {task: Sequential(Flatten(),
-                                  LazyLinear(out_features=1024), ReLU(),
-                                  Linear(in_features=1024, out_features=1024), ReLU(),
-                                  Linear(in_features=1024, out_features=1), ReLU(),
-                                  Sigmoid()).to(device) for task in tasks}
+        heads = {task: [{"type": "Flatten"},
+                        {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
+                        {"type": "Linear", "in_features": 1024, "out_features": 1024}, {"type": "ReLU"},
+                        {"type": "Linear", "in_features": 1024, "out_features": 1},
+                        {"type": "Sigmoid"}] for task in tasks}
 
         losses = {task: BCELoss() for task in tasks}
 
