@@ -57,14 +57,17 @@ class MLFnetDataset(Dataset):
 
 class MultimonDataset(MLFnetDataset):
     def __init__(self, data_file, type_dict, gen_dict, key_mask, img_path, device, no_mask=False, random_transforms=0,
-                 random_transforms_list=None):
+                 random_transforms_list=None, load_fraction=1):
         # TODO add on the fly index masking to enable k fold
         super().__init__(data_file, key_mask, img_path, device, no_mask, random_transforms, random_transforms_list)
-        full_data = self.parse_datafile(data_file, type_dict=type_dict, gen_dict=gen_dict)  # loads full dataset
-        # uses enumerate to assign ids for filtering by index mask
-        self.data = {key: full_data[key] for key in full_data if key in key_mask or no_mask}
 
-    def parse_datafile(self, data_path, type_dict, gen_dict, tqdm_on=True):
+        self.no_mask = no_mask
+        key_mask = key_mask[:int(len(key_mask) * load_fraction)]
+        self.data = self.parse_datafile(data_file, key_mask, type_dict=type_dict,
+                                        gen_dict=gen_dict)  # loads image key and targets
+
+    def parse_datafile(self, data_path, key_filter, type_dict, gen_dict, tqdm_on=True):
+        filter = dict.fromkeys(key_filter, True)  # using a filter dict saves iterating over the filters
         data = dict()
         with open(data_path) as file:
             if tqdm_on:
@@ -75,10 +78,11 @@ class MultimonDataset(MLFnetDataset):
 
             for line in lines:
                 splits = line.split(",")
-                data[splits[0]] = {"Type": zeros(len(type_dict)).scatter_(0, tensor([type_dict[s] for s
-                                                                                     in splits[1:3]]), 1),
-                                   "Gen": zeros(len(gen_dict)).scatter_(0, tensor([gen_dict[splits[3]]]), 1),
-                                   "Shiny": tensor([int(splits[4].strip() == "True")]).float()}
+                if filter.get(splits[0], False) or self.no_mask:
+                    data[splits[0]] = {"Type": zeros(len(type_dict)).scatter_(0, tensor([type_dict[s] for s
+                                                                                         in splits[1:3]]), 1),
+                                       "Gen": zeros(len(gen_dict)).scatter_(0, tensor([gen_dict[splits[3]]]), 1),
+                                       "Shiny": tensor([int(splits[4].strip() == "True")]).float()}
         return data
 
 
@@ -88,12 +92,12 @@ class CelebADataset(MLFnetDataset):
         # TODO add on the fly index masking to enable k fold
         super().__init__(data_file, key_mask, img_path, device, no_mask, random_transforms, random_transforms_list)
 
+        self.no_mask = no_mask
         key_mask = key_mask[:int(len(key_mask) * load_fraction)]
-        full_data = self.parse_datafile(data_file)  # loads full dataset
-        # uses enumerate to assign ids for filtering by index mask
-        self.data = {key: full_data[key] for key in full_data if key in key_mask or no_mask}
+        self.data = self.parse_datafile(data_file, key_mask)  # loads image key and targets
 
-    def parse_datafile(self, data_path, tqdm_on=True):
+    def parse_datafile(self, data_path, key_filter, tqdm_on=True):
+        filter = dict.fromkeys(key_filter, True)  # using a filter dict saves iterating over the filters
         data = dict()
         with open(data_path) as file:
             if tqdm_on:
@@ -104,7 +108,8 @@ class CelebADataset(MLFnetDataset):
 
             for line in lines:
                 splits = line.split(",")
-                data[splits[0]] = [tensor(int(s)) for s in splits[1:]]
+                if filter.get(splits[0], False) or self.no_mask:
+                    data[splits[0]] = [tensor(int(s)) for s in splits[1:]]
         return data
 
 

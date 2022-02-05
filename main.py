@@ -30,7 +30,7 @@ def get_context_parts(context, device, batch_size):
                               RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
 
     if context == "celeba":
-        load_fraction = 0.5
+        load_fraction = 1
         train_dataset = CelebADataset(data_file=f"./data/{context}/labels.txt", key_mask=partitions["train"],
                                       img_path=f"./data/{context}/data", device=device, no_mask=False,
                                       random_transforms=2, random_transforms_list=random_transforms_list,
