@@ -1,3 +1,5 @@
+from datetime import date
+
 import torch
 from torch import tensor, optim, topk, round
 from torch.nn import BCELoss, BCEWithLogitsLoss
@@ -111,7 +113,8 @@ def main():
     print(f"{device=}")
 
     batch_size = 32
-    train_dataloader, test_dataloader, valid_dataloader, heads, losses = get_context_parts("celeba", device,
+    context = "celeba"
+    train_dataloader, test_dataloader, valid_dataloader, heads, losses = get_context_parts(context, device,
                                                                                            batch_size)
 
     model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device)
@@ -140,8 +143,12 @@ def main():
                 "Train -- Acc Type(All):{train-type-all:.4%} | Type(Any):{train-type-any:.4%} | "
                 "Gen:{train-gen:.4%} | Shiny:{train-shiny:.4%}\n"
                 "Test  -- Acc Type(All):{test-type-all:.4%} | Type(Any):{test-type-any:.4%} | "
-                "Gen:{test-gen:.4%} | Shiny:{test-shiny:.4%}"
-                )
+                "Gen:{test-gen:.4%} | Shiny:{test-shiny:.4%}")
+
+    datetime_now = date.today().strftime("%Y-%m-%d-%H-%M-%S")
+    with open(f"data-{context}-{datetime_now}.csv", "w") as f:
+        f.write("epoch,batch,task,param_id,param_value\n")
+
     for epoch in range(epochs):
         stats = dict()
         if epoch % 3 == 0 and epoch > 0:
@@ -184,6 +191,10 @@ def main():
                     preds = model(data)
                     ls = {head: losses[head](preds[head], labels[head]) for head in ["Type", "Gen", "Shiny"]}
                     model.collect_weight_updates(losses=ls)
+
+                    with open(f"data-{context}-{datetime_now}.csv", "a") as f:
+                        for task in model.update_vectors:
+                            pass
 
                 # ACCURACY
                 # TODO try more advanced metrics f1 etc?
