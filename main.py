@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 
 import torch
 from torch import tensor, optim, topk, round
@@ -30,7 +30,7 @@ def get_context_parts(context, device, batch_size):
                               RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
 
     if context == "celeba":
-        load_fraction = 1
+        load_fraction = 0.25
         train_dataset = CelebADataset(data_file=f"./data/{context}/labels.txt", key_mask=partitions["train"],
                                       img_path=f"./data/{context}/data", device=device, no_mask=False,
                                       random_transforms=2, random_transforms_list=random_transforms_list,
@@ -112,8 +112,8 @@ def main():
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # use GPU if CUDA is available
     print(f"{device=}")
 
-    batch_size = 32
-    context = "celeba"
+    batch_size = 16
+    context = "multimon"
     train_dataloader, test_dataloader, valid_dataloader, heads, losses = get_context_parts(context, device,
                                                                                            batch_size)
 
@@ -145,8 +145,8 @@ def main():
                 "Test  -- Acc Type(All):{test-type-all:.4%} | Type(Any):{test-type-any:.4%} | "
                 "Gen:{test-gen:.4%} | Shiny:{test-shiny:.4%}")
 
-    datetime_now = date.today().strftime("%Y-%m-%d-%H-%M-%S")
-    with open(f"data-{context}-{datetime_now}.csv", "w") as f:
+    datetime_now = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+    with open(f"stats/data-{context}-{datetime_now}.csv", "w") as f:
         f.write("epoch,batch,task,param_id,param_value\n")
 
     for epoch in range(epochs):
@@ -165,7 +165,7 @@ def main():
             else:
                 data_loader = valid_dataloader
 
-            for data, labels in data_loader:
+            for batch, (data, labels) in enumerate(data_loader):
                 data = data.to(device)
                 # labels are all tensors which can be moved but the list itself cannot
                 labels["Type"] = labels["Type"].to(device)
@@ -192,9 +192,10 @@ def main():
                     ls = {head: losses[head](preds[head], labels[head]) for head in ["Type", "Gen", "Shiny"]}
                     model.collect_weight_updates(losses=ls)
 
-                    with open(f"data-{context}-{datetime_now}.csv", "a") as f:
+                    with open(f"stats/data-{context}-{datetime_now}.csv", "a") as f:
                         for task in model.update_vectors:
-                            pass
+                            for id_, value in enumerate(model.update_vectors[task][0]):
+                                f.write(f"{epoch},{batch},{task},{id_ + 1},{value}\n")
 
                 # ACCURACY
                 # TODO try more advanced metrics f1 etc?
