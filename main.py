@@ -126,8 +126,8 @@ def main():
               {"type": "Conv2d", "in_channels": 48, "out_channels": 48, "kernel_size": (3, 3), "stride": (1, 1),
                "padding": 0, "padding_mode": "zeros"}]
 
-    optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)  # TODO adaptive lr, big jumps when first starting
-    scheduler = lr_scheduler.ExponentialLR(optimizer, gamma=0.25, verbose=True)
+    optimiser = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)  # TODO adaptive lr, big jumps when first starting
+    scheduler = lr_scheduler.ExponentialLR(optimiser, gamma=0.25, verbose=True)
 
     epochs = len(layers) * 3
     stats_history = {"train-type-all": [], "train-type-any": [], "train-gen": [], "train-shiny": [],
@@ -142,7 +142,9 @@ def main():
         stats = dict()
         if epoch % 3 == 0 and epoch > 0:
             model.freeze_model()
-            model.add_layer(None, **layers[epoch // 3 - 1])
+            new_layers = model.add_layer(None, **layers[epoch // 3 + 1])
+            for layer in new_layers:
+                optimiser.add_param_group({"params": layer.parameters()})
             scheduler.step()
 
         # using an internal loop for training/testing we avoid duplicating code
@@ -172,7 +174,7 @@ def main():
                     total_loss = type_loss + gen_loss + shiny_loss
                     total_loss.backward()
 
-                    optimizer.step()
+                    optimiser.step()
                 elif phase == "test":  # otherwise just get results without gradients or back prop
                     with torch.no_grad():
                         preds = model(data)
