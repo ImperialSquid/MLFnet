@@ -82,16 +82,12 @@ def get_context_parts(context, device, batch_size):
 
         heads = {"Type": [{"type": "Flatten"},
                           {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
-                          {"type": "Linear", "in_features": 1024, "out_features": 1024}, {"type": "ReLU"},
                           {"type": "Linear", "in_features": 1024, "out_features": len(type_counts)}],
                  "Gen": [{"type": "Flatten"},
                          {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
-                         {"type": "Linear", "in_features": 1024, "out_features": 1024}, {"type": "ReLU"},
                          {"type": "Linear", "in_features": 1024, "out_features": len(gen_counts)}],
                  "Shiny": [{"type": "Flatten"},
                            {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
-                           {"type": "Linear", "in_features": 1024, "out_features": 1024}, {"type": "ReLU"},
-                           {"type": "Linear", "in_features": 1024, "out_features": 1024}, {"type": "ReLU"},
                            {"type": "Linear", "in_features": 1024, "out_features": 1}, {"type": "Sigmoid"}]}
         losses = {"Type": BCEWithLogitsLoss(pos_weight=tensor([type_counts[t] / sum(type_counts.values())
                                                                for t in type_counts])).to(device),
@@ -110,8 +106,8 @@ def main():
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # use GPU if CUDA is available
     print(f"{device=}")
 
-    batch_size = 32
-    train_dataloader, test_dataloader, valid_dataloader, heads, losses = get_context_parts("celeba", device,
+    batch_size = 16
+    train_dataloader, test_dataloader, valid_dataloader, heads, losses = get_context_parts("multimon", device,
                                                                                            batch_size)
 
     model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device)
@@ -165,7 +161,7 @@ def main():
                 labels["Gen"] = labels["Gen"].to(device)
                 labels["Shiny"] = labels["Shiny"].to(device)
 
-                optimizer.zero_grad()
+                optimiser.zero_grad()
 
                 if phase == "train":  # only if we are training do we back prop
                     preds = model(data)
