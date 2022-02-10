@@ -52,7 +52,6 @@ def get_context_parts(context, device, batch_size):
 
         heads = {task: [{"type": "Flatten"},
                         {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
-                        {"type": "Linear", "in_features": 1024, "out_features": 1024}, {"type": "ReLU"},
                         {"type": "Linear", "in_features": 1024, "out_features": 1},
                         {"type": "Sigmoid"}] for task in tasks}
 
