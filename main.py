@@ -106,7 +106,8 @@ def main():
     print(f"{device=}")
 
     batch_size = 16
-    train_dataloader, test_dataloader, valid_dataloader, heads, losses = get_context_parts("multimon", device,
+    context = "multimon"
+    train_dataloader, test_dataloader, valid_dataloader, heads, losses = get_context_parts(context, device,
                                                                                            batch_size)
 
     model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device)
