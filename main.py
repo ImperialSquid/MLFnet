@@ -147,12 +147,13 @@ def main():
     scheduler = lr_scheduler.ExponentialLR(optimiser, gamma=0.25, verbose=True)
 
     epochs = len(layers) * 3
-    stats_history = {"train-type": [], "train-gen": [], "train-shiny": [],
-                     "test-type": [], "test-gen": [], "test-shiny": []}
+    stats_history = {f"{phase}-{task}": list() for task in model.tasks for phase in ["train", "test"]}
 
-    out_para = ("Epoch {epoch}/{epochs}\n"
-                "Train -- Acc Type(All):{train-type:.4%} | Gen:{train-gen:.4%} | Shiny:{train-shiny:.4%}\n"
-                "Test  -- Acc Type(All):{test-type:.4%} | Gen:{test-gen:.4%} | Shiny:{test-shiny:.4%}")
+    out_para = ("Epoch {epoch}/{epochs}\n" +
+                "\n".join([f"{phase.title()} -- Acc\t" +
+                           " | ".join([f"{task.title()}:{{{phase}-{task}:.4%}}"
+                                       for task in model.tasks])
+                           for phase in ["train", "test"]]))
 
     for epoch in range(epochs):
         stats = dict()
@@ -200,7 +201,7 @@ def main():
                     model.collect_weight_updates(losses=ls)
 
                 # ACCURACY
-                for task in preds:
+                for task in model.tasks:
                     acc = get_acc(task=task, preds=preds[task], labels=labels[task])
                     stats[phase + "-" + task] = [*stats.get(phase + "-" + "task", []),
                                                  [acc, preds[task].size()[0]]]
