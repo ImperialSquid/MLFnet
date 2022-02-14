@@ -57,6 +57,11 @@ def get_context_parts(context, device, batch_size):
 
         losses = {task: BCELoss() for task in tasks}
 
+        def get_accuracy(task, preds, labels):
+            # all celeba tasks are binary so we use the same test for all
+            return sum([p == l for p, l in zip(round(preds).tolist(), labels.tolist())])
+
+
     elif context == "multimon":
         with open("data\\multimon\\type_weights.txt", "r") as f:
             type_counts = {line.split(":")[0]: int(line.split(":")[1].strip()) for line in f}
@@ -94,11 +99,23 @@ def get_context_parts(context, device, batch_size):
                                                               for g in gen_counts])).to(device),
                   "Shiny": BCELoss()}
 
+        def get_accuracy(task, preds, labels):
+            if task == "Type":
+                return sum([sum(x in p_ind for x in l_ind) > 0 for p_ind, l_ind in
+                            zip(topk(preds, dim=1, k=2).indices.tolist(),
+                                topk(labels, dim=1, k=2).indices.tolist())])
+            elif task == "Gen":
+                return sum([p_ind == l_ind for p_ind, l_ind in
+                            zip(topk(preds, dim=1, k=1).indices.tolist(),
+                                topk(labels, dim=1, k=1).indices.tolist())])
+            else:
+                return sum([p == l for p, l in zip(round(preds).tolist(), labels.tolist())])
+
     train_dataloader = DataLoader(batch_size=batch_size, dataset=train_dataset, shuffle=True)
     test_dataloader = DataLoader(batch_size=batch_size, dataset=test_dataset, shuffle=True)
     valid_dataloader = DataLoader(batch_size=batch_size, dataset=valid_dataset, shuffle=True)
 
-    return train_dataloader, test_dataloader, valid_dataloader, heads, losses
+    return train_dataloader, test_dataloader, valid_dataloader, heads, losses, get_accuracy
 
 
 def main():
@@ -106,9 +123,9 @@ def main():
     print(f"{device=}")
 
     batch_size = 16
-    context = "multimon"
-    train_dataloader, test_dataloader, valid_dataloader, heads, losses = get_context_parts(context, device,
-                                                                                           batch_size)
+    context = "celeba"
+    train_dataloader, test_dataloader, valid_dataloader, heads, losses, get_acc = get_context_parts(context, device,
+                                                                                                    batch_size)
 
     model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device)
     model.add_layer(None,
@@ -184,31 +201,10 @@ def main():
                     model.collect_weight_updates(losses=ls)
 
                 # ACCURACY
-                # TODO try more advanced metrics f1 etc?
-                # For All Type accuracy, check if the top 2 indices are *identical*
-                type_cor_all = sum([p_ind == l_ind for
-                                    p_ind, l_ind in zip(topk(preds["Type"], dim=1, k=2).indices.tolist(),
-                                                        topk(labels["Type"], dim=1, k=2).indices.tolist())])
-                stats[phase + "-type-all"] = [*stats.get(phase + "-type-all", []),
-                                              [type_cor_all, preds["Type"].size()[0]]]
-
-                # For Any Type accuracy, check if at least one index occurs in each least
-                type_cor_any = sum([sum(x in p_ind for x in l_ind) > 0 for
-                                    p_ind, l_ind in zip(topk(preds["Type"], dim=1, k=2).indices.tolist(),
-                                                        topk(labels["Type"], dim=1, k=2).indices.tolist())])
-                stats[phase + "-type-any"] = [*stats.get(phase + "-type-any", []),
-                                              [type_cor_any, preds["Type"].size()[0]]]
-
-                # Gen accuracy is the same as All Type accuracy but it's top 1 not top 2 accuracy
-                # (This could be done with argmax but I was copy pasting and lazy)
-                gen_cor = sum(
-                    [p_ind == l_ind for p_ind, l_ind in zip(topk(preds["Gen"], dim=1, k=1).indices.tolist(),
-                                                            topk(labels["Gen"], dim=1, k=1).indices.tolist())])
-                stats[phase + "-gen"] = [*stats.get(phase + "-gen", []), [gen_cor, preds["Type"].size()[0]]]
-
-                # For Shiny accuracy we just round and check equivalence since it's one number
-                shiny_cor = sum([p == l for p, l in zip(round(preds["Shiny"]).tolist(), labels["Shiny"].tolist())])
-                stats[phase + "-shiny"] = [*stats.get(phase + "-shiny", []), [shiny_cor, preds["Type"].size()[0]]]
+                for task in preds:
+                    acc = get_acc(task=task, preds=preds[task], labels=labels[task])
+                    stats[phase + "-" + task] = [*stats.get(phase + "-" + "task", []),
+                                                 [acc, preds[task].size()[0]]]
 
         # Convert [[correct1, tested1], [correct2, tested2]] into (correct1+2)/(tested1+2) Cannot just
         # store [correct1/tested1, correct2/tested2] and average since not all batch counts are same
