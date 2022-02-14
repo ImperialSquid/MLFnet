@@ -61,7 +61,6 @@ def get_context_parts(context, device, batch_size):
             # all celeba tasks are binary so we use the same test for all
             return sum([p == l for p, l in zip(round(preds).tolist(), labels.tolist())])
 
-
     elif context == "multimon":
         with open("data\\multimon\\type_weights.txt", "r") as f:
             type_counts = {line.split(":")[0]: int(line.split(":")[1].strip()) for line in f}
@@ -111,11 +110,11 @@ def get_context_parts(context, device, batch_size):
             else:
                 return sum([p == l for p, l in zip(round(preds).tolist(), labels.tolist())])
 
-    train_dataloader = DataLoader(batch_size=batch_size, dataset=train_dataset, shuffle=True)
-    test_dataloader = DataLoader(batch_size=batch_size, dataset=test_dataset, shuffle=True)
-    valid_dataloader = DataLoader(batch_size=batch_size, dataset=valid_dataset, shuffle=True)
+    train_dl = DataLoader(batch_size=batch_size, dataset=train_dataset, shuffle=True)
+    test_dl = DataLoader(batch_size=batch_size, dataset=test_dataset, shuffle=True)
+    valid_dl = DataLoader(batch_size=batch_size, dataset=valid_dataset, shuffle=True)
 
-    return train_dataloader, test_dataloader, valid_dataloader, heads, losses, get_accuracy
+    return train_dl, test_dl, valid_dl, heads, losses, get_accuracy
 
 
 def main():
@@ -124,8 +123,7 @@ def main():
 
     batch_size = 16
     context = "celeba"
-    train_dataloader, test_dataloader, valid_dataloader, heads, losses, get_acc = get_context_parts(context, device,
-                                                                                                    batch_size)
+    train_dl, test_dl, valid_dl, heads, losses, get_acc = get_context_parts(context, device, batch_size)
 
     model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device)
     model.add_layer(None,
@@ -143,7 +141,7 @@ def main():
               {"type": "Conv2d", "in_channels": 48, "out_channels": 48, "kernel_size": (3, 3), "stride": (1, 1),
                "padding": 0, "padding_mode": "zeros"}]
 
-    optimiser = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)  # TODO adaptive lr, big jumps when first starting
+    optimiser = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     scheduler = lr_scheduler.ExponentialLR(optimiser, gamma=0.25, verbose=True)
 
     epochs = len(layers) * 3
@@ -167,11 +165,11 @@ def main():
         # using an internal loop for training/testing we avoid duplicating code
         for phase in ["train", "test", "validate"]:
             if phase == "train":
-                data_loader = train_dataloader
+                data_loader = train_dl
             elif phase == "test":
-                data_loader = test_dataloader
+                data_loader = test_dl
             else:
-                data_loader = valid_dataloader
+                data_loader = valid_dl
 
             for data, labels in data_loader:
                 data = data.to(device)
@@ -190,9 +188,11 @@ def main():
                     total_loss.backward()
 
                     optimiser.step()
+
                 elif phase == "test":  # otherwise just get results without gradients or back prop
                     with torch.no_grad():
                         preds = model(data)
+
                 else:  # if validating also check grouping of tasks (and do branches etc)
                     preds = model(data)
                     ls = {head: losses[head](preds[head], labels[head]) for head in model.tasks}
