@@ -147,14 +147,13 @@ def main():
     scheduler = lr_scheduler.ExponentialLR(optimiser, gamma=0.25, verbose=True)
 
     epochs = len(layers) * 3
-    stats_history = {"train-type-all": [], "train-type-any": [], "train-gen": [], "train-shiny": [],
-                     "test-type-all": [], "test-type-any": [], "test-gen": [], "test-shiny": []}
+    stats_history = {"train-type": [], "train-gen": [], "train-shiny": [],
+                     "test-type": [], "test-gen": [], "test-shiny": []}
+
     out_para = ("Epoch {epoch}/{epochs}\n"
-                "Train -- Acc Type(All):{train-type-all:.4%} | Type(Any):{train-type-any:.4%} | "
-                "Gen:{train-gen:.4%} | Shiny:{train-shiny:.4%}\n"
-                "Test  -- Acc Type(All):{test-type-all:.4%} | Type(Any):{test-type-any:.4%} | "
-                "Gen:{test-gen:.4%} | Shiny:{test-shiny:.4%}"
-                )
+                "Train -- Acc Type(All):{train-type:.4%} | Gen:{train-gen:.4%} | Shiny:{train-shiny:.4%}\n"
+                "Test  -- Acc Type(All):{test-type:.4%} | Gen:{test-gen:.4%} | Shiny:{test-shiny:.4%}")
+
     for epoch in range(epochs):
         stats = dict()
         if epoch % 3 == 0 and epoch > 0:
