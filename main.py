@@ -176,19 +176,17 @@ def main():
             for data, labels in data_loader:
                 data = data.to(device)
                 # labels are all tensors which can be moved but the list itself cannot
-                labels["Type"] = labels["Type"].to(device)
-                labels["Gen"] = labels["Gen"].to(device)
-                labels["Shiny"] = labels["Shiny"].to(device)
+                for task in model.tasks:
+                    labels[task] = labels[task].to(device)
 
                 optimiser.zero_grad()
 
                 if phase == "train":  # only if we are training do we back prop
                     preds = model(data)
 
-                    type_loss = losses["Type"](preds["Type"], labels["Type"])
-                    gen_loss = losses["Gen"](preds["Gen"], labels["Gen"])
-                    shiny_loss = losses["Shiny"](preds["Shiny"], labels["Shiny"])
-                    total_loss = type_loss + gen_loss + shiny_loss
+                    total_loss = 0.0
+                    for task in model.tasks:
+                        total_loss += losses[task](preds[task], labels[task])
                     total_loss.backward()
 
                     optimiser.step()
@@ -197,7 +195,7 @@ def main():
                         preds = model(data)
                 else:  # if validating also check grouping of tasks (and do branches etc)
                     preds = model(data)
-                    ls = {head: losses[head](preds[head], labels[head]) for head in ["Type", "Gen", "Shiny"]}
+                    ls = {head: losses[head](preds[head], labels[head]) for head in model.tasks}
                     model.collect_weight_updates(losses=ls)
 
                 # ACCURACY
