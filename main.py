@@ -162,7 +162,7 @@ def main():
         stats = {f"{phase}-{task}": list([0, 0]) for task in model.tasks for phase in ["train", "test"]}
         if epoch % 3 == 0 and epoch > 0:
             model.freeze_model()
-            new_layers = model.add_layer(None, **layers[epoch // 3 + 1])
+            new_layers = model.add_layer(None, **layers[epoch // 3 - 1])
             for layer in new_layers:
                 optimiser.add_param_group({"params": layer.parameters()})
             scheduler.step()
