@@ -20,14 +20,13 @@ def get_context_parts(context, device, batch_size):
             elif line.split(",")[1].strip() == "2":
                 partitions["test"].append(line.split(",")[0])
 
-    random_transforms_list = [RandomResizedCrop(size=96, scale=(0.7, 1.0), ratio=(3 / 4, 4 / 3)),
-                              RandomHorizontalFlip(1), RandomVerticalFlip(1),  # Force a flip if selected
-                              RandomAffine(degrees=45),  # picks an angle between -45 and +45
-                              RandomAffine(degrees=0, shear=[-30, 30, 0, 0]),  # X shear
-                              RandomAffine(degrees=0, shear=[0, 0, -30, 30]),  # X shear
-                              RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
-
     if context == "celeba":
+        random_transforms_list = [RandomResizedCrop(size=(218, 178), scale=(0.7, 1.0), ratio=(3 / 4, 4 / 3)),
+                                  RandomHorizontalFlip(1), RandomVerticalFlip(1),  # Force a flip if selected
+                                  RandomAffine(degrees=45),  # picks an angle between -45 and +45
+                                  RandomAffine(degrees=0, shear=[-30, 30, 0, 0]),  # X shear
+                                  RandomAffine(degrees=0, shear=[0, 0, -30, 30]),  # X shear
+                                  RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
         load_fraction = 1
         train_dataset = CelebADataset(data_file=f"./data/{context}/labels.txt", key_mask=partitions["train"],
                                       img_path=f"./data/{context}/data", device=device, no_mask=False,
@@ -69,6 +68,13 @@ def get_context_parts(context, device, batch_size):
         with open("data\\multimon\\gen_weights.txt", "r") as f:
             gen_counts = {line.split(":")[0]: int(line.split(":")[1].strip()) for line in f}
             gen_indexes = {line.split(":")[0]: index for index, line in enumerate(gen_counts)}
+
+        random_transforms_list = [RandomResizedCrop(size=96, scale=(0.7, 1.0), ratio=(3 / 4, 4 / 3)),
+                                  RandomHorizontalFlip(1), RandomVerticalFlip(1),  # Force a flip if selected
+                                  RandomAffine(degrees=45),  # picks an angle between -45 and +45
+                                  RandomAffine(degrees=0, shear=[-30, 30, 0, 0]),  # X shear
+                                  RandomAffine(degrees=0, shear=[0, 0, -30, 30]),  # X shear
+                                  RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
 
         train_dataset = MultimonDataset(data_file=f".\\data\\{context}\\labels.txt", device=device,
                                         type_dict=type_indexes, gen_dict=gen_indexes,
