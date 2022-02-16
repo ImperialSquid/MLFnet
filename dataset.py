@@ -8,6 +8,7 @@ from torch.utils.data import Dataset
 from torchvision.io import read_image
 from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, RandomVerticalFlip, RandomAffine, \
     RandomOrder, Compose
+from torchvision.transforms.functional import resize
 from tqdm import tqdm
 
 
@@ -47,6 +48,8 @@ class MLFnetDataset(Dataset):
             else:
                 transforms = RandomOrder(transform_list)
             image = transforms(image)
+
+        image = resize(image, [64, 64])
 
         return image, labels
 
@@ -92,6 +95,14 @@ class CelebADataset(MLFnetDataset):
         # TODO add on the fly index masking to enable k fold
         super().__init__(data_file, key_mask, img_path, device, no_mask, random_transforms, random_transforms_list)
 
+        self.tasks = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", "Bags_Under_Eyes", "Bald",
+                      "Bangs", "Big_Lips", "Big_Nose", "Black_Hair", "Blond_Hair", "Blurry", "Brown_Hair",
+                      "Bushy_Eyebrows", "Chubby", "Double_Chin", "Eyeglasses", "Goatee", "Gray_Hair",
+                      "Heavy_Makeup", "High_Cheekbones", "Male", "Mouth_Slightly_Open", "Mustache",
+                      "Narrow_Eyes", "No_Beard", "Oval_Face", "Pale_Skin", "Pointy_Nose", "Receding_Hairline",
+                      "Rosy_Cheeks", "Sideburns", "Smiling", "Straight_Hair", "Wavy_Hair", "Wearing_Earrings",
+                      "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", "Wearing_Necktie", "Young"]
+
         self.no_mask = no_mask
         key_mask = key_mask[:int(len(key_mask) * load_fraction)]
         self.data = self.parse_datafile(data_file, key_mask)  # loads image key and targets
@@ -109,7 +120,8 @@ class CelebADataset(MLFnetDataset):
             for line in lines:
                 splits = line.split(",")
                 if filter.get(splits[0], False) or self.no_mask:
-                    data[splits[0]] = [tensor(int(s)) for s in splits[1:]]
+                    data[splits[0]] = {task: value.unsqueeze(0) for task, value in
+                                       zip(self.tasks, [tensor(int(s)).float() for s in splits[1:]])}
         return data
 
 
