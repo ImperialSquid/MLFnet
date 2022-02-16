@@ -27,7 +27,7 @@ def get_context_parts(context, device, batch_size):
                                   RandomAffine(degrees=0, shear=[-30, 30, 0, 0]),  # X shear
                                   RandomAffine(degrees=0, shear=[0, 0, -30, 30]),  # X shear
                                   RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
-        load_fraction = 1
+        load_fraction = 0.25
         train_dataset = CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions["train"],
                                       img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
                                       random_transforms=2, random_transforms_list=random_transforms_list,
@@ -47,7 +47,7 @@ def get_context_parts(context, device, batch_size):
                  "Heavy_Makeup", "High_Cheekbones", "Male", "Mouth_Slightly_Open", "Mustache",
                  "Narrow_Eyes", "No_Beard", "Oval_Face", "Pale_Skin", "Pointy_Nose", "Receding_Hairline",
                  "Rosy_Cheeks", "Sideburns", "Smiling", "Straight_Hair", "Wavy_Hair", "Wearing_Earrings",
-                 "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", "Wearing_Necktie", "Young"]
+                 "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", "Wearing_Necktie", "Young"][:3]
 
         heads = {task: [{"type": "Flatten"},
                         {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
@@ -151,16 +151,15 @@ def main():
     scheduler = lr_scheduler.ExponentialLR(optimiser, gamma=0.25, verbose=True)
 
     epochs = len(layers) * 3
-    stats_history = {f"{phase}-{task}": list() for task in model.tasks for phase in ["train", "test"]}
 
     out_para = ("Epoch {epoch}/{epochs}\n" +
-                "\n".join([f"{phase.title()} -- Acc\t" +
+                "\n".join([f"{phase.title():10} -- Acc\t" +
                            " | ".join([f"{task.title()}:{{{phase}-{task}:.4%}}"
                                        for task in model.tasks])
                            for phase in ["train", "test"]]))
 
     for epoch in range(epochs):
-        stats = dict()
+        stats = {f"{phase}-{task}": list([0, 0]) for task in model.tasks for phase in ["train", "test"]}
         if epoch % 3 == 0 and epoch > 0:
             model.freeze_model()
             new_layers = model.add_layer(None, **layers[epoch // 3 + 1])
@@ -205,16 +204,17 @@ def main():
                     model.collect_weight_updates(losses=ls)
 
                 # ACCURACY
-                for task in model.tasks:
-                    acc = get_acc(task=task, preds=preds[task], labels=labels[task])
-                    stats[phase + "-" + task] = [*stats.get(phase + "-" + "task", []),
-                                                 [acc, preds[task].size()[0]]]
+                if phase in ["train", "test"]:
+                    for task in model.tasks:
+                        acc = get_acc(task=task, preds=preds[task], labels=labels[task])
+                        batch_size = preds[task].size()[0]
+                        stats[phase + "-" + task][0] += acc
+                        stats[phase + "-" + task][1] += batch_size
 
         # Convert [[correct1, tested1], [correct2, tested2]] into (correct1+2)/(tested1+2) Cannot just
         # store [correct1/tested1, correct2/tested2] and average since not all batch counts are same
-        for stat in stats:
-            stats[stat] = sum([n[0] for n in stats[stat]]) / sum([n[1] for n in stats[stat]])
-            stats_history[stat] = stats_history.get(stat, []) + [stats[stat]]
+        for task in stats:
+            stats[task] = stats[task][0] / stats[task][1]
 
         # Print results per epoch
         print(out_para.format(epoch=epoch + 1, epochs=epochs, **stats))
