@@ -28,16 +28,16 @@ def get_context_parts(context, device, batch_size):
                                   RandomAffine(degrees=0, shear=[0, 0, -30, 30]),  # X shear
                                   RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
         load_fraction = 1
-        train_dataset = CelebADataset(data_file=f"./data/{context}/labels.txt", key_mask=partitions["train"],
-                                      img_path=f"./data/{context}/data", device=device, no_mask=False,
+        train_dataset = CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions["train"],
+                                      img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
                                       random_transforms=2, random_transforms_list=random_transforms_list,
                                       load_fraction=load_fraction)
-        test_dataset = CelebADataset(data_file=f"./data/{context}/labels.txt", key_mask=partitions["test"],
-                                     img_path=f"./data/{context}/data", device=device, no_mask=False,
+        test_dataset = CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions["test"],
+                                     img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
                                      random_transforms=2, random_transforms_list=random_transforms_list,
                                      load_fraction=load_fraction)
-        valid_dataset = CelebADataset(data_file=f"./data/{context}/labels.txt", key_mask=partitions["valid"],
-                                      img_path=f"./data/{context}/data", device=device, no_mask=False,
+        valid_dataset = CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions["valid"],
+                                      img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
                                       random_transforms=2, random_transforms_list=random_transforms_list,
                                       load_fraction=load_fraction)
 
