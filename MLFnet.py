@@ -7,8 +7,6 @@ from torch.nn.utils import parameters_to_vector
 from utils import ModelMixin
 
 
-# TODO Publish: formalised javadoc style documentation
-# TODO Publish: finish and double check type checking
 class MLFnet(nn.Module, ModelMixin):
     def __init__(self, tasks: Tuple[str, ...] = tuple(), heads: Optional[Dict[str, Type[nn.Module]]] = None,
                  backbone: Optional[Type[nn.Module]] = None, device=None, debug=False):
@@ -22,21 +20,16 @@ class MLFnet(nn.Module, ModelMixin):
             backbone = nn.Identity()  # if no backbone is given just use an Identity layer to change nothing
         self.backbone = backbone
 
-        self.tasks = tuple(sorted(tasks))  # stores a tuple of the task names
-        self.groups = {task: self.tasks for task in self.tasks}  # maps task names to the group they belong to
-        # maps group tuples to a list of the blocks they pass through (all tasks in a group share the same
-        # path but with separate heads)
-        self.paths = {group: ["_".join(group)] for group in self.groups.values()}
-
-        # blocks maps block names to lists of layers
-        # (names are derived from the names of the tasks that pass through them)
-        self.blocks = dict()
+        self.tasks = tuple(sorted(tasks))  # stores names of tasks
+        self.groups = {task: self.tasks for task in self.tasks}  # maps tasks to their task group
+        self.paths = {group: ["_".join(group)] for group in self.groups.values()}  # maps groups to their list of blocks
+        self.blocks = dict()  # stores layers in blocks, blocks correspond to groups of tasks
         self.blocks["_".join(self.tasks)] = list()
         self.finished = []  # any block that has subsequent blocks is "finished" and shouldn't be added to
 
         # store head dicts and set to Identity layer if non existent
         self.head_dicts = {t: heads.get(t, [{"type": "Identity"}]) for t in self.tasks}
-        self.heads = dict()
+        self.heads = dict()  # stores instantiated heads (heads are reinstantiated when a layer is added)
         self.reset_heads()
 
         self.update_vectors = dict()
@@ -53,9 +46,9 @@ class MLFnet(nn.Module, ModelMixin):
         # group_results stores the output for each group's path before heads
         group_results = {}
         # block results stores the output of each block
+        # since each block sees exactly one input it's safe to cache the results (also saves time for expensive blocks)
         block_results = {}
-        # since each block sees exactly one input it's safe to cache the results
-        # this also saves on multiple passes for expensive blocks
+
         for group in self.paths:  # iter over each group so we take every possible path through
             group_results[group] = x
             # iter over each block in a path until they have all been applied (or fetched from cache)
@@ -92,25 +85,21 @@ class MLFnet(nn.Module, ModelMixin):
         new_layers = []
 
         if kwargs["type"] == "custom":  # add custom layers through "custom" type
-            # this is aimed at more complex Seqentials of layers which are to be repeated in future
-            # WARNING passing the same object in multiple times will get around regrouping checks,
-            # this is on the user to ensure
-            # TODO Extras: safety checks that new layer is a proper type to be added
-            # TODO Extras: consider avoiding issue of accidental regroups using deepcopy?
+            # this is aimed at more complex Sequentials of layers which are to be repeated in future
+            # WARNING passing the same object in multiple times will get around regrouping checks
             new_layer = kwargs["custom"].to(self.device)  # get custom block and move to device
             self.blocks[target_block].append(new_layer)
             new_layers.append(new_layer)  # new block should be returned as usual
-        else:
-            if target_group is not None:  # add the new layer to the desired group
+        elif target_group is not None:  # add the new layer to the desired group
+            new_layer = self._layer_from_dict(layer_dict=kwargs)
+            self.blocks[target_block].append(new_layer)
+            new_layers.append(new_layer)
+        else:  # None is allowed when adding layers to every group (ie every block not in finished)
+            for unfinished in [block for block in self.blocks if block not in self.finished]:
+                # new layers are instantiated inside the loop to prevent references to the same layer
                 new_layer = self._layer_from_dict(layer_dict=kwargs)
-                self.blocks[target_block].append(new_layer)
+                self.blocks[unfinished].append(new_layer)
                 new_layers.append(new_layer)
-            else:  # None is allowed when adding layers to every group (ie every block not in finished)
-                for unfinished in [block for block in self.blocks if block not in self.finished]:
-                    # new layers are instantiated inside the loop to prevent references to the same layer
-                    new_layer = self._layer_from_dict(layer_dict=kwargs)
-                    self.blocks[unfinished].append(new_layer)
-                    new_layers.append(new_layer)
 
         # TODO Investigate: look into whether forcing a reset_head is always needed, this may be a temporary line and
         #  it's up to the user to choose in later versions
@@ -142,7 +131,7 @@ class MLFnet(nn.Module, ModelMixin):
         del self.paths[old_group]  # make sure to delete the old group's path
         self.finished.append("_".join(old_group))  # mark the block as finished so no more layers are added
 
-        self.compile_model()  # recompile model
+        self.compile_model()
 
     def frozen_states(self):  # fetches a dict of layers and whether they are frozen (ie is .requires_grad True?)
         layers = {}
@@ -186,7 +175,6 @@ class MLFnet(nn.Module, ModelMixin):
         return new_layer
 
     def compile_model(self):
-        # safe to use dict comprehension here since PyTorch is already aware of the layers
         # compiling has no effect on running speed, it just improves code readability elsewhere
         for block in self.blocks:
             self._compiled_blocks[block] = nn.Sequential(*self.blocks[block])

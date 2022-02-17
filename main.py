@@ -153,7 +153,7 @@ def main():
     epochs = len(layers) * 3
 
     out_para = ("Epoch {epoch}/{epochs}\n" +
-                "\n".join([f"{phase.title():10} -- Acc\t" +
+                "\n".join([f"{phase.title():7} -- \t" +
                            " | ".join([f"{task.title()}:{{{phase}-{task}:.4%}}"
                                        for task in model.tasks])
                            for phase in ["train", "test"]]))
