@@ -23,22 +23,16 @@ class MLFnet(nn.Module, ModelMixin):
         self.tasks = tuple(sorted(tasks))  # stores names of tasks
         self.groups = {task: self.tasks for task in self.tasks}  # maps tasks to their task group
         self.paths = {group: ["_".join(group)] for group in self.groups.values()}  # maps groups to their list of blocks
-        self.blocks = dict()  # stores layers in blocks, blocks correspond to groups of tasks
-        self.blocks["_".join(self.tasks)] = list()
+        self.blocks = nn.ModuleDict()  # stores layers in blocks, blocks correspond to groups of tasks
+        self.blocks["_".join(self.tasks)] = nn.ModuleList()
         self.finished = []  # any block that has subsequent blocks is "finished" and shouldn't be added to
 
         # store head dicts and set to Identity layer if non existent
         self.head_dicts = {t: heads.get(t, [{"type": "Identity"}]) for t in self.tasks}
-        self.heads = dict()  # stores instantiated heads (heads are reinstantiated when a layer is added)
+        self.heads = nn.ModuleDict()  # stores instantiated heads (heads are reinstantiated when a layer is added)
         self.reset_heads()
 
         self.update_vectors = dict()
-
-        # the compiled attrs store versions where the lists have been nn.Sequential-ised for simplicity later
-        # ModuleDict and  ModuleList are used over builtins since they make PyTorch aware of any Module's existence
-        self._compiled_heads = nn.ModuleDict()
-        self._compiled_blocks = nn.ModuleDict()
-        self.compile_model()
 
     def forward(self, x):
         x = self.backbone(x)  # pass data through shared backbone before heads
@@ -56,7 +50,7 @@ class MLFnet(nn.Module, ModelMixin):
                 if block in block_results:
                     group_results[group] = block_results[block]
                 else:
-                    result = self._compiled_blocks[block](group_results[group])
+                    result = nn.Sequential(*self.blocks[block])(group_results[group])
                     # update group results as we go through, this will be overwritten until the last block
                     group_results[group] = result
                     block_results[block] = result
@@ -65,7 +59,7 @@ class MLFnet(nn.Module, ModelMixin):
         # now take each group result and pass it through it's associated head
         for group in group_results:
             for task in group:
-                out[task] = self._compiled_heads[task](group_results[group])
+                out[task] = nn.Sequential(*self.heads[task])(group_results[group])
         return out
 
     def add_layer(self, target_group: Optional[Tuple[str, ...]] = None, **kwargs):
@@ -104,7 +98,6 @@ class MLFnet(nn.Module, ModelMixin):
         # TODO Investigate: look into whether forcing a reset_head is always needed, this may be a temporary line and
         #  it's up to the user to choose in later versions
         self.reset_heads(target_tasks=target_group)  # we don't want old heads affecting new layers so they are reset
-        self.compile_model()  # recompile model to update the Sequentials
 
         return new_layers
 
@@ -126,12 +119,10 @@ class MLFnet(nn.Module, ModelMixin):
                 self.groups[task] = new_group  # reassign tasks to their new group
             # update the path by adding the new block name
             self.paths[new_group] = self.paths[old_group] + ["_".join(new_group), ]
-            self.blocks["_".join(new_group)] = list()  # create new block
+            self.blocks["_".join(new_group)] = nn.ModuleList()  # create new block
 
         del self.paths[old_group]  # make sure to delete the old group's path
         self.finished.append("_".join(old_group))  # mark the block as finished so no more layers are added
-
-        self.compile_model()
 
     def frozen_states(self):  # fetches a dict of layers and whether they are frozen (ie is .requires_grad True?)
         layers = {}
@@ -160,7 +151,7 @@ class MLFnet(nn.Module, ModelMixin):
             target_tasks = self.tasks
 
         for task in target_tasks:
-            self.heads[task] = list()
+            self.heads[task] = nn.ModuleList()
             for layer in self.head_dicts[task]:
                 self.heads[task].append(self._layer_from_dict(layer))
 
@@ -173,13 +164,6 @@ class MLFnet(nn.Module, ModelMixin):
         new_layer = layer(**layer_dict).to(self.device)
 
         return new_layer
-
-    def compile_model(self):
-        # compiling has no effect on running speed, it just improves code readability elsewhere
-        for block in self.blocks:
-            self._compiled_blocks[block] = nn.Sequential(*self.blocks[block])
-        for head in self.heads:
-            self._compiled_heads[head] = nn.Sequential(*self.heads[head])
 
     def load_test_setup(self):
         # just an example setup
