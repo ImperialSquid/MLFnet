@@ -131,21 +131,21 @@ def main():
     context = "celeba"
     train_dl, test_dl, valid_dl, heads, losses, get_acc = get_context_parts(context, device, batch_size)
 
-    model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device)
-    model.add_layer(None,
-                    **{"type": "Conv2d", "in_channels": 3, "out_channels": 6, "kernel_size": (3, 3), "stride": (1, 1),
-                       "padding": 0, "padding_mode": "zeros"})
+    layers = [{"type": "Conv2d", "in_channels": 3, "out_channels": 6, "kernel_size": (3, 3),
+               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
+              {"type": "Conv2d", "in_channels": 6, "out_channels": 12, "kernel_size": (3, 3),
+               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
+              {"type": "Conv2d", "in_channels": 12, "out_channels": 24, "kernel_size": (3, 3),
+               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
+              {"type": "Conv2d", "in_channels": 24, "out_channels": 48, "kernel_size": (3, 3),
+               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
+              {"type": "Conv2d", "in_channels": 48, "out_channels": 48, "kernel_size": (3, 3),
+               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
+              {"type": "Conv2d", "in_channels": 48, "out_channels": 48, "kernel_size": (3, 3),
+               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"}]
 
-    layers = [{"type": "Conv2d", "in_channels": 6, "out_channels": 12, "kernel_size": (3, 3), "stride": (1, 1),
-               "padding": 0, "padding_mode": "zeros"},
-              {"type": "Conv2d", "in_channels": 12, "out_channels": 24, "kernel_size": (3, 3), "stride": (1, 1),
-               "padding": 0, "padding_mode": "zeros"},
-              {"type": "Conv2d", "in_channels": 24, "out_channels": 48, "kernel_size": (3, 3), "stride": (1, 1),
-               "padding": 0, "padding_mode": "zeros"},
-              {"type": "Conv2d", "in_channels": 48, "out_channels": 48, "kernel_size": (3, 3), "stride": (1, 1),
-               "padding": 0, "padding_mode": "zeros"},
-              {"type": "Conv2d", "in_channels": 48, "out_channels": 48, "kernel_size": (3, 3), "stride": (1, 1),
-               "padding": 0, "padding_mode": "zeros"}]
+    model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device)
+    model.add_layer(None, **layers.pop(0))
 
     optimiser = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     scheduler = lr_scheduler.ExponentialLR(optimiser, gamma=0.25, verbose=True)
@@ -162,7 +162,7 @@ def main():
         stats = {f"{phase}-{task}": list([0, 0]) for task in model.tasks for phase in ["train", "test"]}
         if epoch % 2 == 0 and epoch > 0:
             model.freeze_model()
-            new_layers = model.add_layer(None, **layers[epoch // 2 - 1])
+            new_layers = model.add_layer(None, **layers.pop(0))
             for layer in new_layers:
                 optimiser.add_param_group({"params": layer.parameters()})
             scheduler.step()
