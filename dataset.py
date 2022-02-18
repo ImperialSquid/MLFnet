@@ -32,11 +32,9 @@ class MLFnetDataset(Dataset):
     def __getitem__(self, idx):
         key = list(self.data.keys())[idx]
         img_path = os.path.join(self.img_path, key)
-        image = read_image(img_path).float()
+        image = read_image(img_path).float().to(self.device)
         image /= 255
         labels = self.data[key]
-
-        image.to(self.device)
 
         if self.random_transforms_list:
             if self.random_transforms > 0:  # only self.random_transforms > 0 requires filtering
