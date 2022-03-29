@@ -32,8 +32,6 @@ class MLFnet(nn.Module, ModelMixin):
         self.heads = nn.ModuleDict()  # stores instantiated heads (heads are reinstantiated when a layer is added)
         self.reset_heads()
 
-        self.update_vectors = dict()
-
     def forward(self, x):
         x = self.backbone(x)  # pass data through shared backbone before heads
 
@@ -132,7 +130,9 @@ class MLFnet(nn.Module, ModelMixin):
         layers = {l: not any(layers[l]) for l in layers}
         return layers
 
-    def collect_weight_updates(self, losses: Dict[str, Type[nn.Module]]):
+    def collect_param_grads(self, losses: Dict[str, Type[nn.Module]]):
+        grad_vectors = dict()
+
         self.zero_grad()
         for task in losses:
             # retain_graph is required since we are backward-ing multiple losses over the same layers separately
@@ -142,9 +142,11 @@ class MLFnet(nn.Module, ModelMixin):
             for name, param in self.named_parameters():
                 if param.requires_grad and "blocks" in name:  # filter frozen params and those not in the blocks
                     modules.append(parameters_to_vector(param.grad))
-            self.update_vectors[task] = self.update_vectors.get(task, list()) + [concat(modules).tolist()]
+            grad_vectors[task] = grad_vectors.get(task, list()) + [concat(modules).tolist()]
 
             self.zero_grad()
+
+        return grad_vectors
 
     def reset_heads(self, target_tasks: Optional[Tuple[str, ...]] = None):
         if target_tasks is None:  # if tasks is None, reset all

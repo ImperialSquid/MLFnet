@@ -201,7 +201,7 @@ def main():
                 else:  # if validating also check grouping of tasks (and do branches etc)
                     preds = model(data)
                     ls = {head: losses[head](preds[head], labels[head]) for head in model.tasks}
-                    model.collect_weight_updates(losses=ls)
+                    model.collect_param_grads(losses=ls)
 
                 # ACCURACY
                 if phase in ["train", "test"]:
