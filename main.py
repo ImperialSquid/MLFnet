@@ -1,3 +1,5 @@
+from datetime import datetime as dt
+
 import torch
 from torch import tensor, optim, topk, round
 from torch.nn import BCELoss, BCEWithLogitsLoss
@@ -158,6 +160,10 @@ def main():
                                        for task in model.tasks])
                            for phase in ["train", "test"]]))
 
+    out_file = f"stats\\data-{context}-{dt.now().strftime('%Y-%m-%d-%H-%M-%S')}.csv"
+    with open(out_file, "w") as f:
+        f.write("epoch,batch,task,task_id,param_id,param_value\n")
+
     for epoch in range(epochs):
         stats = {f"{phase}-{task}": list([0, 0]) for task in model.tasks for phase in ["train", "test"]}
         if epoch % 2 == 0 and epoch > 0:
@@ -176,7 +182,7 @@ def main():
             else:
                 data_loader = valid_dl
 
-            for data, labels in data_loader:
+            for b_id, (data, labels) in enumerate(data_loader):
                 data = data.to(device)
                 # labels are all tensors which can be moved but the list itself cannot
                 for task in model.tasks:
@@ -201,7 +207,12 @@ def main():
                 else:  # if validating also check grouping of tasks (and do branches etc)
                     preds = model(data)
                     ls = {head: losses[head](preds[head], labels[head]) for head in model.tasks}
-                    model.collect_param_grads(losses=ls)
+                    grads = model.collect_param_grads(losses=ls)
+
+                    with open(out_file, "a") as f:
+                        for t_id, task in enumerate(model.tasks):
+                            for g_id, grad in enumerate(grads[task]):
+                                f.write(f"{epoch},{b_id},{task},{t_id},{g_id},{grad}\n")
 
                 # ACCURACY
                 if phase in ["train", "test"]:
