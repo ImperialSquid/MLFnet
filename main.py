@@ -222,8 +222,6 @@ def main():
                         stats[phase + "-" + task][0] += acc
                         stats[phase + "-" + task][1] += batch_size
 
-        # Convert [[correct1, tested1], [correct2, tested2]] into (correct1+2)/(tested1+2) Cannot just
-        # store [correct1/tested1, correct2/tested2] and average since not all batch counts are same
         for task in stats:
             stats[task] = stats[task][0] / stats[task][1]
 
