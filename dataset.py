@@ -64,8 +64,8 @@ class MultimonDataset(MLFnetDataset):
 
         self.no_mask = no_mask
         key_mask = key_mask[:int(len(key_mask) * load_fraction)]
-        self.data = self.parse_datafile(data_file, key_mask, type_dict=type_dict,
-                                        gen_dict=gen_dict)  # loads image key and targets
+        # loads image key and targets
+        self.data = self.parse_datafile(data_file, key_mask, type_dict=type_dict, gen_dict=gen_dict)
 
     def parse_datafile(self, data_path, key_filter, type_dict, gen_dict, tqdm_on=True):
         filter = dict.fromkeys(key_filter, True)  # using a filter dict saves iterating over the filters
@@ -77,13 +77,15 @@ class MultimonDataset(MLFnetDataset):
             else:
                 lines = file
 
-            for line in lines:
+            for line in lines[1:]:
                 splits = line.split(",")
                 if filter.get(splits[0], False) or self.no_mask:
-                    data[splits[0]] = {"Type": zeros(len(type_dict)).scatter_(0, tensor([type_dict[s] for s
-                                                                                         in splits[1:3]]), 1),
-                                       "Gen": zeros(len(gen_dict)).scatter_(0, tensor([gen_dict[splits[3]]]), 1),
-                                       "Shiny": tensor([int(splits[4].strip() == "True")]).float()}
+                    d1 = {"Type": zeros(len(type_dict)).scatter_(0, tensor([type_dict[s] for s in splits[1:3]]), 1),
+                          "Gen": zeros(len(gen_dict)).scatter_(0, tensor([gen_dict[splits[3]]]), 1)}
+                    d2 = {task.title(): tensor(splits[i + 4]).float() for i, task in
+                          enumerate(["hp", "att", "def", "spatt", "spdef", "speed", "height", "weight"])}
+                    data[splits[0]] = {**d1, **d2}
+
         return data
 
 
