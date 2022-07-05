@@ -29,7 +29,7 @@ def get_context_parts(context, device, batch_size):
                                   RandomAffine(degrees=0, shear=[-30, 30, 0, 0]),  # X shear
                                   RandomAffine(degrees=0, shear=[0, 0, -30, 30]),  # X shear
                                   RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
-        load_fraction = 0.25
+        load_fraction = 0.1
         train_dataset = CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions["train"],
                                       img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
                                       random_transforms=2, random_transforms_list=random_transforms_list,
@@ -52,8 +52,9 @@ def get_context_parts(context, device, batch_size):
                  "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", "Wearing_Necktie", "Young"][:3]
 
         heads = {task: [{"type": "Flatten"},
-                        {"type": "LazyLinear", "out_features": 128}, {"type": "ReLU"},
-                        {"type": "Linear", "in_features": 128, "out_features": 1},
+                        {"type": "LazyLinear", "out_features": 512}, {"type": "ReLU"},
+                        {"type": "Linear", "in_features": 512, "out_features": 512},
+                        {"type": "Linear", "in_features": 512, "out_features": 1},
                         {"type": "Sigmoid"}] for task in tasks}
 
         losses = {task: BCELoss() for task in tasks}
@@ -92,14 +93,14 @@ def get_context_parts(context, device, batch_size):
                                         random_transforms=2, random_transforms_list=random_transforms_list)
 
         heads = {"Type": [{"type": "Flatten"},
-                          {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
-                          {"type": "Linear", "in_features": 1024, "out_features": len(type_counts)}],
+                          {"type": "LazyLinear", "out_features": 512}, {"type": "ReLU"},
+                          {"type": "Linear", "in_features": 512, "out_features": len(type_counts)}],
                  "Gen": [{"type": "Flatten"},
-                         {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
-                         {"type": "Linear", "in_features": 1024, "out_features": len(gen_counts)}],
+                         {"type": "LazyLinear", "out_features": 512}, {"type": "ReLU"},
+                         {"type": "Linear", "in_features": 512, "out_features": len(gen_counts)}],
                  "Shiny": [{"type": "Flatten"},
-                           {"type": "LazyLinear", "out_features": 1024}, {"type": "ReLU"},
-                           {"type": "Linear", "in_features": 1024, "out_features": 1}, {"type": "Sigmoid"}]}
+                           {"type": "LazyLinear", "out_features": 512}, {"type": "ReLU"},
+                           {"type": "Linear", "in_features": 512, "out_features": 1}, {"type": "Sigmoid"}]}
         losses = {"Type": BCEWithLogitsLoss(pos_weight=tensor([type_counts[t] / sum(type_counts.values())
                                                                for t in type_counts])).to(device),
                   "Gen": BCEWithLogitsLoss(pos_weight=tensor([gen_counts[g] / sum(gen_counts.values())
