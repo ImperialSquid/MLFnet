@@ -6,48 +6,32 @@ from matplotlib import pyplot as plt
 from torch import zeros, tensor
 from torch.utils.data import Dataset
 from torchvision.io import read_image
-from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, RandomVerticalFlip, RandomAffine, \
-    RandomOrder, Compose
+from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, RandomVerticalFlip, RandomAffine
 from torchvision.transforms.functional import resize
 from tqdm import tqdm
 
 
 class MLFnetDataset(Dataset):
-    def __init__(self, data_file, key_mask, img_path, device, no_mask=False,
-                 random_transforms=0, random_transforms_list=None):
+    def __init__(self, data_file, key_mask, img_path, device, no_mask=False, transforms=None, output_size=None):
         self.img_path = img_path
         self.device = device
-
-        self.random_transforms_list = random_transforms_list
-        transform_list_len = len(self.random_transforms_list) if self.random_transforms_list is not None else 0
-        self.random_transforms = min(random_transforms, transform_list_len)
-        self.random_transforms = max(-1, self.random_transforms)
-        # random transforms
-        # Value   | -1                | 0            | 0<n<=len(transforms)
-        # Result  | All in rand order | All in order | Randomly pick n to apply
+        self.transforms = transforms
+        self.output_size = output_size
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
         key = list(self.data.keys())[idx]
+
         img_path = os.path.join(self.img_path, key)
         image = read_image(img_path).float().to(self.device)
-        image /= 255
+        if self.transforms is not None:
+            image = self.transforms(image)
+        if self.output_size is not None:
+            image = resize(image, self.output_size)
+
         labels = self.data[key]
-
-        if self.random_transforms_list:
-            if self.random_transforms > 0:  # only self.random_transforms > 0 requires filtering
-                transform_list = sample(self.random_transforms_list, self.random_transforms)
-            else:
-                transform_list = self.random_transforms_list
-            if self.random_transforms == 0:  # only self.random_transforms == 0 requires in order
-                transforms = Compose(transform_list)
-            else:
-                transforms = RandomOrder(transform_list)
-            image = transforms(image)
-
-        image = resize(image, [64, 64])
 
         return image, labels
 
@@ -57,10 +41,10 @@ class MLFnetDataset(Dataset):
 
 
 class MultimonDataset(MLFnetDataset):
-    def __init__(self, data_file, type_dict, gen_dict, key_mask, img_path, device, no_mask=False, random_transforms=0,
-                 random_transforms_list=None, load_fraction=1):
+    def __init__(self, data_file, type_dict, gen_dict, key_mask, img_path, device, no_mask=False, transforms=None,
+                 output_size=None, load_fraction=1):
         # TODO add on the fly index masking to enable k fold
-        super().__init__(data_file, key_mask, img_path, device, no_mask, random_transforms, random_transforms_list)
+        super().__init__(data_file, key_mask, img_path, device, no_mask, transforms, output_size)
 
         self.no_mask = no_mask
         key_mask = key_mask[:int(len(key_mask) * load_fraction)]
@@ -92,10 +76,10 @@ class MultimonDataset(MLFnetDataset):
 
 
 class CelebADataset(MLFnetDataset):
-    def __init__(self, data_file, key_mask, img_path, device, no_mask=False, random_transforms=0,
-                 random_transforms_list=None, load_fraction=1):
+    def __init__(self, data_file, key_mask, img_path, device, no_mask=False, transforms=None,
+                 output_size=None, load_fraction=1):
         # TODO add on the fly index masking to enable k fold
-        super().__init__(data_file, key_mask, img_path, device, no_mask, random_transforms, random_transforms_list)
+        super().__init__(data_file, key_mask, img_path, device, no_mask, transforms, output_size)
 
         self.tasks = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", "Bags_Under_Eyes", "Bald",
                       "Bangs", "Big_Lips", "Big_Nose", "Black_Hair", "Blond_Hair", "Blurry", "Brown_Hair",
@@ -158,8 +142,7 @@ if __name__ == '__main__':
                               ]
 
     random_data = MultimonDataset(data_file="data.txt", type_dict=types, gen_dict=gens, device=device,
-                                  key_mask=[], no_mask=True, img_path="./sprites/processed",
-                                  random_transforms_list=random_transforms_list, random_transforms=2)
+                                  key_mask=[], no_mask=True, img_path="./sprites/processed")
 
     for data, labels in random_data:
         print("Here!")
