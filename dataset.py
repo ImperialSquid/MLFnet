@@ -80,8 +80,10 @@ class MultimonDataset(MLFnetDataset):
             for line in lines[1:]:
                 splits = line.split(",")
                 if filter.get(splits[0], False) or self.no_mask:
+                    # type and gen require special handling
                     d1 = {"Type": zeros(len(type_dict)).scatter_(0, tensor([type_dict[s] for s in splits[1:3]]), 1),
                           "Gen": zeros(len(gen_dict)).scatter_(0, tensor([gen_dict[splits[3]]]), 1)}
+                    # all other tasks are handled the same way so we can use a dict comprehension
                     d2 = {task.title(): tensor(splits[i + 4]).float() for i, task in
                           enumerate(["hp", "att", "def", "spatt", "spdef", "speed", "height", "weight"])}
                     data[splits[0]] = {**d1, **d2}
