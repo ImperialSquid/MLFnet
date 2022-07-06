@@ -26,12 +26,11 @@ def get_context_parts(context, device, batch_size, transforms):
     if context == "celeba":
         load_fraction = 0.1
 
-        train_dataset, \
-        test_dataset, \
-        valid_dataset = [CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions[type_],
-                                       img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
-                                       transforms=transforms[type_], load_fraction=load_fraction)
-                         for type_ in ["train", "test", "valid"]]
+        train_dataset, test_dataset, valid_dataset = \
+            [CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions[type_],
+                           img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
+                           transforms=transforms[type_], load_fraction=load_fraction)
+             for type_ in ["train", "test", "valid"]]
 
         tasks = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", "Bags_Under_Eyes", "Bald",
                  "Bangs", "Big_Lips", "Big_Nose", "Black_Hair", "Blond_Hair", "Blurry", "Brown_Hair",
@@ -62,13 +61,12 @@ def get_context_parts(context, device, batch_size, transforms):
             gen_counts = {line.split(":")[0]: int(line.split(":")[1].strip()) for line in f}
             gen_indexes = {line.split(":")[0]: index for index, line in enumerate(gen_counts)}
 
-        train_dataset, \
-        test_dataset, \
-        valid_dataset = [MultimonDataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions[type_],
-                                         type_dict=type_indexes, gen_dict=gen_indexes,
-                                         img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
-                                         transforms=transforms[type_])
-                         for type_ in ["train", "test", "valid"]]
+        train_dataset, test_dataset, valid_dataset = \
+            [MultimonDataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions[type_],
+                             type_dict=type_indexes, gen_dict=gen_indexes,
+                             img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
+                             transforms=transforms[type_])
+             for type_ in ["train", "test", "valid"]]
 
         heads = {"Type": [{"type": "Flatten"},
                           {"type": "LazyLinear", "out_features": 512}, {"type": "ReLU"},
