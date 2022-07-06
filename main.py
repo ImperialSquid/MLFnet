@@ -5,13 +5,14 @@ from torch import tensor, optim, topk, round
 from torch.nn import BCELoss, BCEWithLogitsLoss
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
-from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, RandomVerticalFlip, RandomAffine
+from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, Compose, ToTensor, Normalize, Resize, \
+    CenterCrop
 
 from MLFnet import MLFnet
 from dataset import MultimonDataset, CelebADataset
 
 
-def get_context_parts(context, device, batch_size):
+def get_context_parts(context, device, batch_size, transforms):
     partitions = {"train": [], "test": [], "valid": []}
     with open(f"./data/{context}/partitions.txt") as f:
         for line in f.readlines():
@@ -23,25 +24,14 @@ def get_context_parts(context, device, batch_size):
                 partitions["test"].append(line.split(",")[0])
 
     if context == "celeba":
-        random_transforms_list = [RandomResizedCrop(size=(218, 178), scale=(0.7, 1.0), ratio=(3 / 4, 4 / 3)),
-                                  RandomHorizontalFlip(1), RandomVerticalFlip(1),  # Force a flip if selected
-                                  RandomAffine(degrees=45),  # picks an angle between -45 and +45
-                                  RandomAffine(degrees=0, shear=[-30, 30, 0, 0]),  # X shear
-                                  RandomAffine(degrees=0, shear=[0, 0, -30, 30]),  # X shear
-                                  RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
         load_fraction = 0.1
-        train_dataset = CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions["train"],
-                                      img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
-                                      random_transforms=2, random_transforms_list=random_transforms_list,
-                                      load_fraction=load_fraction)
-        test_dataset = CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions["test"],
-                                     img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
-                                     random_transforms=2, random_transforms_list=random_transforms_list,
-                                     load_fraction=load_fraction)
-        valid_dataset = CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions["valid"],
-                                      img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
-                                      random_transforms=2, random_transforms_list=random_transforms_list,
-                                      load_fraction=load_fraction)
+
+        train_dataset, \
+        test_dataset, \
+        valid_dataset = [CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions[type_],
+                                       img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
+                                       transforms=transforms[type_], load_fraction=load_fraction)
+                         for type_ in ["train", "test", "valid"]]
 
         tasks = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", "Bags_Under_Eyes", "Bald",
                  "Bangs", "Big_Lips", "Big_Nose", "Black_Hair", "Blond_Hair", "Blurry", "Brown_Hair",
@@ -72,25 +62,13 @@ def get_context_parts(context, device, batch_size):
             gen_counts = {line.split(":")[0]: int(line.split(":")[1].strip()) for line in f}
             gen_indexes = {line.split(":")[0]: index for index, line in enumerate(gen_counts)}
 
-        random_transforms_list = [RandomResizedCrop(size=96, scale=(0.7, 1.0), ratio=(3 / 4, 4 / 3)),
-                                  RandomHorizontalFlip(1), RandomVerticalFlip(1),  # Force a flip if selected
-                                  RandomAffine(degrees=45),  # picks an angle between -45 and +45
-                                  RandomAffine(degrees=0, shear=[-30, 30, 0, 0]),  # X shear
-                                  RandomAffine(degrees=0, shear=[0, 0, -30, 30]),  # X shear
-                                  RandomAffine(degrees=0, translate=[0.2, 0.2])]  # X shear
-
-        train_dataset = MultimonDataset(data_file=f".\\data\\{context}\\labels.txt", device=device,
-                                        type_dict=type_indexes, gen_dict=gen_indexes,
-                                        key_mask=partitions["train"], img_path=f".\\data\\{context}\\data",
-                                        random_transforms=2, random_transforms_list=random_transforms_list)
-        test_dataset = MultimonDataset(data_file=f".\\data\\{context}\\labels.txt", device=device,
-                                       type_dict=type_indexes, gen_dict=gen_indexes,
-                                       key_mask=partitions["test"], img_path=f".\\data\\{context}\\data",
-                                       random_transforms=2, random_transforms_list=random_transforms_list)
-        valid_dataset = MultimonDataset(data_file=f".\\data\\{context}\\labels.txt", device=device,
-                                        type_dict=type_indexes, gen_dict=gen_indexes,
-                                        key_mask=partitions["valid"], img_path=f".\\data\\{context}\\data",
-                                        random_transforms=2, random_transforms_list=random_transforms_list)
+        train_dataset, \
+        test_dataset, \
+        valid_dataset = [MultimonDataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions[type_],
+                                         type_dict=type_indexes, gen_dict=gen_indexes,
+                                         img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
+                                         transforms=transforms[type_])
+                         for type_ in ["train", "test", "valid"]]
 
         heads = {"Type": [{"type": "Flatten"},
                           {"type": "LazyLinear", "out_features": 512}, {"type": "ReLU"},
@@ -132,7 +110,17 @@ def main():
 
     batch_size = 16
     context = "celeba"
-    train_dl, test_dl, valid_dl, heads, losses, get_acc = get_context_parts(context, device, batch_size)
+    input_size = 64
+    transforms = {
+        'train': Compose([RandomResizedCrop(input_size), RandomHorizontalFlip(),
+                          ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
+        'test': Compose([Resize(input_size), CenterCrop(input_size),
+                         ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
+        'valid': Compose([Resize(input_size), CenterCrop(input_size),
+                          ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
+    }
+    train_dl, test_dl, valid_dl, \
+    heads, losses, get_acc = get_context_parts(context, device, batch_size, input_size, transforms)
 
     layers = [{"type": "Conv2d", "in_channels": 3, "out_channels": 6, "kernel_size": (3, 3),
                "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
