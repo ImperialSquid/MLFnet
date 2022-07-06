@@ -96,6 +96,8 @@ def get_context_parts(context, device, batch_size, transforms):
                                 topk(labels, dim=1, k=1).indices.tolist())])
             else:
                 return sum([p == l for p, l in zip(round(preds).tolist(), labels.tolist())])
+    else:
+        raise ValueError("Invalid context")
 
     train_dl = DataLoader(batch_size=batch_size, dataset=train_dataset, shuffle=True)
     test_dl = DataLoader(batch_size=batch_size, dataset=test_dataset, shuffle=True)
