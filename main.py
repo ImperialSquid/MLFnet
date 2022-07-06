@@ -119,8 +119,8 @@ def main():
         'valid': Compose([Resize(input_size), CenterCrop(input_size),
                           ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
     }
-    train_dl, test_dl, valid_dl, \
-    heads, losses, get_acc = get_context_parts(context, device, batch_size, input_size, transforms)
+    train_dl, test_dl, valid_dl, heads, losses, get_acc = \
+        get_context_parts(context, device, batch_size, input_size, transforms)
 
     layers = [{"type": "Conv2d", "in_channels": 3, "out_channels": 6, "kernel_size": (3, 3),
                "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
