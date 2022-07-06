@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from torch import zeros, tensor
 from torch.utils.data import Dataset
 from torchvision.io import read_image
-from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, RandomVerticalFlip, RandomAffine
+from torchvision.transforms import RandomResizedCrop, Compose, ToTensor
 from torchvision.transforms.functional import resize
 from tqdm import tqdm
 
@@ -132,17 +132,10 @@ if __name__ == '__main__':
     # testing_data = MultimonDataset(data_file="data.txt", type_dict=types, gen_dict=gens,
     #                                index_mask=testing_index_mask, img_path="./sprites/processed")
 
-    random_transforms_list = [RandomResizedCrop(size=96, scale=(0.7, 1.0), ratio=(3 / 4, 4 / 3)),
-                              RandomHorizontalFlip(1),  # Force a flip if selected
-                              RandomVerticalFlip(1),
-                              RandomAffine(degrees=45),  # picks an angle between -45 and +45
-                              RandomAffine(degrees=0, shear=[-30, 30, 0, 0]),  # X shear
-                              RandomAffine(degrees=0, shear=[0, 0, -30, 30]),  # X shear
-                              RandomAffine(degrees=0, translate=[0.2, 0.2])  # X shear
-                              ]
+    transforms = Compose([RandomResizedCrop(64), ToTensor()])
 
     random_data = MultimonDataset(data_file="data.txt", type_dict=types, gen_dict=gens, device=device,
-                                  key_mask=[], no_mask=True, img_path="./sprites/processed")
+                                  key_mask=[], no_mask=True, img_path="./sprites/processed", transforms=transforms)
 
     for data, labels in random_data:
         print("Here!")
