@@ -111,7 +111,7 @@ def main():
 
     batch_size = 16
     context = "celeba"
-    input_size = 64
+    input_size = 256
     transforms = {
         'train': Compose([RandomResizedCrop(input_size), RandomHorizontalFlip(),  # slight randomness for training
                           ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
@@ -123,20 +123,12 @@ def main():
     train_dl, test_dl, valid_dl, heads, losses, get_acc = \
         get_context_parts(context, device, batch_size, transforms)
 
-    layers = [{"type": "Conv2d", "in_channels": 3, "out_channels": 6, "kernel_size": (3, 3),
-               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
-              {"type": "Conv2d", "in_channels": 6, "out_channels": 12, "kernel_size": (3, 3),
-               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
-              {"type": "Conv2d", "in_channels": 12, "out_channels": 24, "kernel_size": (3, 3),
-               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
-              {"type": "Conv2d", "in_channels": 24, "out_channels": 48, "kernel_size": (3, 3),
-               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
-              {"type": "Conv2d", "in_channels": 48, "out_channels": 48, "kernel_size": (3, 3),
-               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"},
-              {"type": "Conv2d", "in_channels": 48, "out_channels": 48, "kernel_size": (3, 3),
-               "stride": (1, 1), "padding": 0, "padding_mode": "zeros"}]
+    backbone = torch.hub.load('pytorch/vision:v0.10.0', 'vgg11', pretrained=True)
 
-    model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device)
+    layers = [{"type": "Linear", "in_channels": 3, "out_channels": 6}]
+
+    model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device, backbone=None)
+    model.add_layer(None, type="Flatten")
     model.add_layer(None, **layers.pop(0))
 
     optimiser = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
