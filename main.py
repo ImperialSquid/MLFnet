@@ -42,9 +42,7 @@ def get_context_parts(context, device, batch_size, transforms):
                  "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", "Wearing_Necktie", "Young"][:3]
 
         heads = {task: [{"type": "Flatten"},
-                        {"type": "LazyLinear", "out_features": 512}, {"type": "ReLU"},
-                        {"type": "Linear", "in_features": 512, "out_features": 512},
-                        {"type": "Linear", "in_features": 512, "out_features": 1},
+                        {"type": "LazyLinear", "out_features": 1},
                         {"type": "Sigmoid"}] for task in tasks}
 
         losses = {task: BCELoss() for task in tasks}
