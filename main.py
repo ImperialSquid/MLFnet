@@ -1,8 +1,9 @@
 from datetime import datetime as dt
+from statistics import mean
 
 import torch
 from torch import tensor, optim, topk, round
-from torch.nn import BCELoss, BCEWithLogitsLoss
+from torch.nn import BCELoss, BCEWithLogitsLoss, MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, Compose, ToTensor, Normalize, Resize, \
@@ -68,20 +69,22 @@ def get_context_parts(context, device, batch_size, transforms):
                              transforms=transforms[type_])
              for type_ in ["train", "test", "valid"]]
 
-        heads = {"Type": [{"type": "Flatten"},
-                          {"type": "LazyLinear", "out_features": 512}, {"type": "ReLU"},
-                          {"type": "Linear", "in_features": 512, "out_features": len(type_counts)}],
-                 "Gen": [{"type": "Flatten"},
-                         {"type": "LazyLinear", "out_features": 512}, {"type": "ReLU"},
-                         {"type": "Linear", "in_features": 512, "out_features": len(gen_counts)}],
-                 "Shiny": [{"type": "Flatten"},
-                           {"type": "LazyLinear", "out_features": 512}, {"type": "ReLU"},
-                           {"type": "Linear", "in_features": 512, "out_features": 1}, {"type": "Sigmoid"}]}
-        losses = {"Type": BCEWithLogitsLoss(pos_weight=tensor([type_counts[t] / sum(type_counts.values())
-                                                               for t in type_counts])).to(device),
-                  "Gen": BCEWithLogitsLoss(pos_weight=tensor([gen_counts[g] / sum(gen_counts.values())
-                                                              for g in gen_counts])).to(device),
-                  "Shiny": BCELoss()}
+        d1 = {"Type": [{"type": "Flatten"},
+                       {"type": "LazyLinear", "out_features": len(type_counts)}],
+              "Gen": [{"type": "Flatten"},
+                      {"type": "LazyLinear", "out_features": len(gen_counts)}]}
+        d2 = {task.title(): [{"type": "Flatten"},
+                             {"type": "LazyLinear", "out_features": 1}]
+              for task in ["hp", "att", "def", "spatt", "spdef", "speed", "height", "weight"]}
+        heads = {**d1, **d2}
+
+        d1 = {"Type": BCEWithLogitsLoss(pos_weight=tensor([type_counts[t] / sum(type_counts.values())
+                                                           for t in type_counts])).to(device),
+              "Gen": BCEWithLogitsLoss(pos_weight=tensor([gen_counts[g] / sum(gen_counts.values())
+                                                          for g in gen_counts])).to(device)}
+        d2 = {task.title(): MSELoss().to(device)
+              for task in ["hp", "att", "def", "spatt", "spdef", "speed", "height", "weight"]}
+        losses = {**d1, **d2}
 
         def get_accuracy(task, preds, labels):
             if task == "Type":
@@ -93,7 +96,7 @@ def get_context_parts(context, device, batch_size, transforms):
                             zip(topk(preds, dim=1, k=1).indices.tolist(),
                                 topk(labels, dim=1, k=1).indices.tolist())])
             else:
-                return sum([p == l for p, l in zip(round(preds).tolist(), labels.tolist())])
+                return mean([(p - l) ** 2 for p, l in zip(round(preds).tolist(), labels.tolist())])
     else:
         raise ValueError("Invalid context")
 
