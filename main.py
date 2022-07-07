@@ -87,15 +87,15 @@ def get_context_parts(context, device, batch_size, transforms):
         losses = {**d1, **d2}
 
         def get_accuracy(task, preds, labels):
-            if task == "Type":
+            if task == "Type":  # sum of predictions where at least one is correct
                 return sum([sum(x in p_ind for x in l_ind) > 0 for p_ind, l_ind in
                             zip(topk(preds, dim=1, k=2).indices.tolist(),
                                 topk(labels, dim=1, k=2).indices.tolist())])
-            elif task == "Gen":
+            elif task == "Gen":  # sum of predictions where gen is correct
                 return sum([p_ind == l_ind for p_ind, l_ind in
                             zip(topk(preds, dim=1, k=1).indices.tolist(),
                                 topk(labels, dim=1, k=1).indices.tolist())])
-            else:
+            else:  # MSE since accuracy is not a simple metric for regression tasks
                 return mean([(p - l) ** 2 for p, l in zip(round(preds).tolist(), labels.tolist())])
     else:
         raise ValueError("Invalid context")
@@ -115,11 +115,11 @@ def main():
     context = "celeba"
     input_size = 64
     transforms = {
-        'train': Compose([RandomResizedCrop(input_size), RandomHorizontalFlip(),
+        'train': Compose([RandomResizedCrop(input_size), RandomHorizontalFlip(),  # slight randomness for training
                           ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
-        'test': Compose([Resize(input_size), CenterCrop(input_size),
+        'test': Compose([Resize(input_size), CenterCrop(input_size),  # no randomness for testing
                          ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
-        'valid': Compose([Resize(input_size), CenterCrop(input_size),
+        'valid': Compose([Resize(input_size), CenterCrop(input_size),  # no randomness for validation
                           ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
     }
     train_dl, test_dl, valid_dl, heads, losses, get_acc = \
