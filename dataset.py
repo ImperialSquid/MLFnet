@@ -1,10 +1,11 @@
 import os
-from random import sample
+from pprint import pprint
 
 import torch
 from matplotlib import pyplot as plt
+from pandas import read_csv
 from torch import zeros, tensor
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
 from torchvision.transforms import RandomResizedCrop, Compose, ToTensor
 from torchvision.transforms.functional import resize
@@ -40,39 +41,73 @@ class MLFnetDataset(Dataset):
     #     print(img.size())
 
 
-class MultimonDataset(MLFnetDataset):
-    def __init__(self, data_file, type_dict, gen_dict, key_mask, img_path, device, no_mask=False, transforms=None,
-                 output_size=None, load_fraction=1):
-        # TODO add on the fly index masking to enable k fold
-        super().__init__(data_file, key_mask, img_path, device, no_mask, transforms, output_size)
+class MultimonDataset(Dataset):
+    def __init__(self, data_file, part_file, img_path, device=None, transforms=None,
+                 partition="train", data_format="raw", output_size=64):
+        if data_file is None or part_file is None or img_path is None:
+            raise ValueError("data_file, part_file, and img_path must be specified")
 
-        self.no_mask = no_mask
-        key_mask = key_mask[:int(len(key_mask) * load_fraction)]
+        if partition not in ["train", "test", "val"]:
+            raise ValueError("partition must be one of 'train', 'test', or 'val'")
+        else:
+            partition = ["train", "test", "val"].index(partition)
+
+        if data_format not in ["raw", "std", "norm"]:
+            data_format = "raw"
+
+        if device is None:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.data_file = data_file
+        self.img_path = img_path
+        self.device = device
+        self.transforms = transforms
+        self.output_size = output_size
+
+        # load partitions
+        self.partitions = self.parse_partitions(part_file, partition)
+
         # loads image key and targets
-        self.data = self.parse_datafile(data_file, key_mask, type_dict=type_dict, gen_dict=gen_dict)
+        self.data = self.parse_datafile(data_file, data_format)
 
-    def parse_datafile(self, data_path, key_filter, type_dict, gen_dict, tqdm_on=True):
-        filter = dict.fromkeys(key_filter, True)  # using a filter dict saves iterating over the filters
-        data = dict()
-        with open(data_path) as file:
-            if tqdm_on:
-                lines = tqdm(file)
-                lines.set_description("Loading dataset... ")
-            else:
-                lines = file
+    def parse_partitions(self, part_file, partition):
+        parts = read_csv(os.path.join(self.img_path, part_file))
+        filter = parts["split"] == partition
+        return parts["index"][filter]
 
-            for line in lines[1:]:
-                splits = line.split(",")
-                if filter.get(splits[0], False) or self.no_mask:
-                    # type and gen require special handling
-                    d1 = {"Type": zeros(len(type_dict)).scatter_(0, tensor([type_dict[s] for s in splits[1:3]]), 1),
-                          "Gen": zeros(len(gen_dict)).scatter_(0, tensor([gen_dict[splits[3]]]), 1)}
-                    # all other tasks are handled the same way so we can use a dict comprehension
-                    d2 = {task.title(): tensor(splits[i + 4]).float() for i, task in
-                          enumerate(["hp", "att", "def", "spatt", "spdef", "speed", "height", "weight"])}
-                    data[splits[0]] = {**d1, **d2}
+    def parse_datafile(self, data_path, data_format="std"):
+        data = read_csv(os.path.join(self.img_path, data_path))
+
+        type_counts = max(data["type1"].max(), data["type2"].max()) + 1
+        gen_counts = data["gen"].max()
+        stats = [x + "_" + data_format for x in ["hp", "att", "def", "spatt", "spdef", "speed"]]
+
+        filter = data["index"].isin(self.partitions)
+        data = data[filter]
+
+        data = {row["index"]: {"type": zeros(type_counts).scatter_(0, tensor([row["type1"], row["type2"]]), 1),
+                               "gen": zeros(gen_counts).scatter_(0, tensor([row["gen"] - 1]), 1),
+                               **{x: tensor(row[x]).float() for x in stats}}
+                for index, row in data.iterrows()}
 
         return data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        key = list(self.data.keys())[idx]
+
+        img_path = os.path.join(self.img_path, key)
+        image = read_image(img_path).float().to(self.device) / 255.0
+        if self.transforms is not None:
+            image = self.transforms(image)
+        if self.output_size is not None:
+            image = resize(image, self.output_size)
+
+        labels = self.data[key]
+
+        return image, labels
 
 
 class CelebADataset(MLFnetDataset):
@@ -115,34 +150,18 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # use GPU if CUDA is available
     print(device)
 
-    with open("data/multimon/gen_weights.txt", "r") as f:
-        gens = {line.split(":")[0]: index for index, line in enumerate(f)}
-    print(gens)
-    with open("data/multimon/type_weights.txt", "r") as f:
-        types = {line.split(":")[0]: index for index, line in enumerate(f)}
-    print(types)
-
-    index_len = len(open("data.txt").readlines())
-
-    training_index_mask = sample([i for i in range(index_len)], int(index_len * 0.8))
-    testing_index_mask = [i for i in range(index_len) if i not in training_index_mask]
-
-    # training_data = MultimonDataset(data_file="data.txt", type_dict=types, gen_dict=gens,
-    #                                 index_mask=training_index_mask, img_path="./sprites/processed")
-    # testing_data = MultimonDataset(data_file="data.txt", type_dict=types, gen_dict=gens,
-    #                                index_mask=testing_index_mask, img_path="./sprites/processed")
-
     transforms = Compose([RandomResizedCrop(64), ToTensor()])
 
-    random_data = MultimonDataset(data_file="data.txt", type_dict=types, gen_dict=gens, device=device,
-                                  key_mask=[], no_mask=True, img_path="./sprites/processed", transforms=transforms)
+    random_data = MultimonDataset(data_file="data.csv", part_file="partitions.csv", img_path="./data/multimon/sprites",
+                                  device=device, transforms=None, partition="train")
 
-    for data, labels in random_data:
-        print("Here!")
+    loader = DataLoader(random_data, batch_size=1, shuffle=True)
+
+    for data, labels in loader:
+        data = data.cpu()[0]
         print(data.permute(1, 2, 0).size())
         plt.imshow(data.permute(1, 2, 0))
         plt.show()
-        input()
-    #
-    # train_dataloader = DataLoader(training_data, batch_size=64, shuffle=True)
-    # test_dataloader = DataLoader(testing_data, batch_size=64, shuffle=True)
+        print("Here!")
+        pprint(labels)
+        input("Enter to continue...")
