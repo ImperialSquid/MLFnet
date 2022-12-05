@@ -1,3 +1,4 @@
+from copy import deepcopy
 from importlib import import_module
 from typing import Optional, Tuple, Dict, Type
 
@@ -60,44 +61,25 @@ class MLFnet(nn.Module, ModelMixin):
                 out[task] = nn.Sequential(*self.heads[task])(group_results[group])
         return out
 
-    def add_layer(self, target_group: Optional[Tuple[str, ...]] = None, **kwargs):
-        if target_group is not None:
-            target_block = "_".join(sorted(target_group))  # derive block name by joining task names with underscores
-            if target_block not in self.blocks or target_block in self.finished:  # more helpful error to raise
-                raise KeyError(f"Target block \"{target_block}\" either doesn't exist or is finished training (blocks "
-                               f"halfway along a path are considered finished to ensure consistent behaviour in "
-                               f"later blocks)")
-        if kwargs["type"] == "custom" and target_group is None:
-            raise ValueError("Cannot add custom blocks when target_group is None. Custom blocks are given already "
-                             "instantiated, adding to multiple groups would effectively recombine them.")
+    def add_layer(self, layer_to_add: nn.Module, target_group: Optional[Tuple[str, ...]] = None):
+        if target_group is None:  # NoneValue target group means add to all groups
+            target_groups = tuple(self.paths.keys())
+            affected_tasks = self.tasks
+        else:
+            target_groups = (target_group,)
+            affected_tasks = target_group
 
-        # need to keep track of newly added layers so they can be passed back and put into the optimiser
-        # optimiser won't update layers it doesn't know about so the results of this should be passed to
-        # optimiser.add_param_group()
+        target_blocks = tuple(["_".join(g) for g in target_groups])  # turn groups into block names
+
         new_layers = []
+        for block in [b for b in target_blocks if b not in self.finished]:  # add to all unfinished groups
+            new = deepcopy(layer_to_add).to(self.device)
+            self.blocks[block].append(new)
+            new_layers.append(new)
 
-        if kwargs["type"] == "custom":  # add custom layers through "custom" type
-            # this is aimed at more complex Sequentials of layers which are to be repeated in future
-            # WARNING passing the same object in multiple times will get around regrouping checks
-            new_layer = kwargs["custom"].to(self.device)  # get custom block and move to device
-            self.blocks[target_block].append(new_layer)
-            new_layers.append(new_layer)  # new block should be returned as usual
-        elif target_group is not None:  # add the new layer to the desired group
-            new_layer = self._layer_from_dict(layer_dict=kwargs)
-            self.blocks[target_block].append(new_layer)
-            new_layers.append(new_layer)
-        else:  # None is allowed when adding layers to every group (ie every block not in finished)
-            for unfinished in [block for block in self.blocks if block not in self.finished]:
-                # new layers are instantiated inside the loop to prevent references to the same layer
-                new_layer = self._layer_from_dict(layer_dict=kwargs)
-                self.blocks[unfinished].append(new_layer)
-                new_layers.append(new_layer)
+        self.reset_heads(target_tasks=affected_tasks)
 
-        # TODO Investigate: look into whether forcing a reset_head is always needed, this may be a temporary line and
-        #  it's up to the user to choose in later versions
-        self.reset_heads(target_tasks=target_group)  # we don't want old heads affecting new layers so they are reset
-
-        return new_layers
+        return new_layers  # return the new layers so they can be added to the optimiser
 
     def freeze_model(self, target_group: Optional[Tuple[str, ...]] = None):
         # freeze every block in the specified group's path
@@ -112,7 +94,7 @@ class MLFnet(nn.Module, ModelMixin):
             raise KeyError(f"There is a mismatch of tasks between the old and new groupings")
 
         for new_group in new_groups:
-            new_group = sorted(new_group)
+            new_group = tuple(sorted(new_group))
             for task in new_group:
                 self.groups[task] = new_group  # reassign tasks to their new group
             # update the path by adding the new block name
@@ -188,33 +170,24 @@ def example_case(case):
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # use GPU if CUDA is available
     print(device)
     if case in ["normal", "unequal"]:
-        model = MLFnet(tasks=("a", "b", "c"), heads=None)
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 3, "out_channels": 128, "kernel_size": (3, 3)})
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 128, "out_channels": 256, "kernel_size": (3, 3)})
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 256, "out_channels": 512, "kernel_size": (3, 3)})
+        model = MLFnet(tasks=("a", "b", "c"), heads=dict())
+        model.add_layer(target_group=None, layer_to_add=nn.Conv2d(3, 32, 3, 1, 1))
+        model.add_layer(target_group=None, layer_to_add=nn.Conv2d(32, 64, 3, 1, 1))
+        model.add_layer(target_group=None, layer_to_add=nn.Conv2d(64, 128, 3, 1, 1))
 
         model.split_group(old_group=("a", "b", "c"), new_groups=(("a", "b"), ("c",)))
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 512, "out_channels": 1024, "kernel_size": (3, 3)})
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 1024, "out_channels": 1024, "kernel_size": (3, 3)})
+        model.add_layer(target_group=None, layer_to_add=nn.Conv2d(128, 256, 3, 1, 1))
+        model.add_layer(target_group=None, layer_to_add=nn.Conv2d(256, 512, 3, 1, 1))
 
         if case == "normal":
-            model.add_layer(target_group=None,
-                            **{"type": "Conv2d", "in_channels": 1024, "out_channels": 2048, "kernel_size": (3, 3)})
-            model.add_layer(target_group=None,
-                            **{"type": "Conv2d", "in_channels": 2048, "out_channels": 4096, "kernel_size": (3, 3)})
+            model.add_layer(target_group=None, layer_to_add=nn.Conv2d(512, 1024, 3, 1, 1))
+            model.add_layer(target_group=None, layer_to_add=nn.Conv2d(1024, 2048, 3, 1, 1))
             print(model)
             model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet")
             model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnet", verbose=True)
         elif case == "unequal":
-            model.add_layer(target_group=("a", "b"),
-                            **{"type": "Conv2d", "in_channels": 1024, "out_channels": 2048, "kernel_size": (3, 3)})
-            model.add_layer(target_group=("a", "b"),
-                            **{"type": "Conv2d", "in_channels": 2048, "out_channels": 4096, "kernel_size": (3, 3)})
+            model.add_layer(target_group=("a", "b"), layer_to_add=nn.Conv2d(512, 1024, 3, 1, 1))
+            model.add_layer(target_group=("a", "b"), layer_to_add=nn.Conv2d(1024, 2048, 3, 1, 1))
             print(model)
             model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal")
             model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetUnequal", verbose=True)
@@ -222,20 +195,16 @@ def example_case(case):
         import string
         tasks = tuple(string.ascii_letters[:10])
         model = MLFnet(tasks=tasks, heads=None)
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
+        model.add_layer(target_group=None, layer_to_add=nn.Conv2d(3, 32, 3, 1, 1))
 
         model.split_group(old_group=tasks, new_groups=(tasks[:4], tasks[4:]))
-        model.add_layer(target_group=None,
-                        **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
+        model.add_layer(target_group=None, layer_to_add=nn.Conv2d(32, 64, 3, 1, 1))
 
         model.split_group(old_group=tasks[:4], new_groups=(tasks[:2], tasks[2:4]))
-        model.add_layer(target_group=tasks[:2],
-                        **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
+        model.add_layer(target_group=tasks[:2], layer_to_add=nn.Conv2d(64, 128, 3, 1, 1))
 
         model.split_group(old_group=tasks[4:], new_groups=(tasks[4:7], tasks[7:]))
-        model.add_layer(target_group=tasks[4:7],
-                        **{"type": "Conv2d", "in_channels": 3, "out_channels": 3, "kernel_size": (3, 3)})
+        model.add_layer(target_group=tasks[4:7], layer_to_add=nn.Conv2d(64, 128, 3, 1, 1))
         print(model)
 
         model.draw(torch.zeros(1, 3, 96, 96), filename="architectures/MLFnetMany")
@@ -243,7 +212,7 @@ def example_case(case):
 
 
 def main():
-    pass
+    example_case("many")
 
 
 if __name__ == "__main__":
