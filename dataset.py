@@ -60,6 +60,11 @@ class MultimonDataset(Dataset):
         self.device = device
         self.transforms = transforms
         self.output_size = output_size
+        self.type_counts = 0
+        self.gen_counts = 0
+
+        self.type_weights = None
+        self.gen_weights = None
 
         # load partitions
         self.partitions = self.parse_partitions(part_file, partition)
@@ -68,22 +73,30 @@ class MultimonDataset(Dataset):
         self.data = self.parse_datafile(data_file)
 
     def parse_partitions(self, part_file, partition):
-        parts = read_csv(os.path.join(self.img_path, part_file))
+        parts = read_csv(os.path.join(self.img_path, "..", part_file))
         filter = parts["split"] == partition
         return parts["index"][filter]
 
     def parse_datafile(self, data_path, data_format="std"):
-        data = read_csv(os.path.join(self.img_path, data_path))
+        data = read_csv(os.path.join(self.img_path, "..", data_path))
 
-        type_counts = max(data["type1"].max(), data["type2"].max()) + 1
-        gen_counts = data["gen"].max()
+        self.type_counts = max(data["type1"].max(), data["type2"].max()) + 1
+        self.gen_counts = data["gen"].max() + 1
+
+        temp1 = data.value_counts("type1").to_dict()
+        temp2 = data.value_counts("type2").to_dict()
+        self.type_weights = {t: (temp1.get(t, 0) + temp2.get(t, 0)) / (2 * len(data))
+                             for t in list(temp1.keys()) + list(temp2.keys())}
+
+        self.gen_weights = data.value_counts("gen").to_dict()
+
         stats = ["hp", "att", "def", "spatt", "spdef", "speed"]
 
         filter = data["index"].isin(self.partitions)
         data = data[filter]
 
-        data = {row["index"]: {"type": zeros(type_counts).scatter_(0, tensor([row["type1"], row["type2"]]), 1),
-                               "gen": zeros(gen_counts).scatter_(0, tensor([row["gen"] - 1]), 1),
+        data = {row["index"]: {"type": zeros(self.type_counts).scatter_(0, tensor([row["type1"], row["type2"]]), 1),
+                               "gen": zeros(self.gen_counts).scatter_(0, tensor([row["gen"]]), 1),
                                **{x: tensor(row[x]).float() for x in stats}}
                 for index, row in data.iterrows()}
 
@@ -100,7 +113,7 @@ class MultimonDataset(Dataset):
         if self.transforms is not None:
             image = self.transforms(image)
         if self.output_size is not None:
-            image = resize(image, self.output_size)
+            image = resize(image, [self.output_size])
 
         labels = self.data[key]
 
