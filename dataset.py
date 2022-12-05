@@ -7,7 +7,7 @@ from pandas import read_csv
 from torch import zeros, tensor
 from torch.utils.data import Dataset, DataLoader
 from torchvision.io import read_image
-from torchvision.transforms import RandomResizedCrop, Compose, ToTensor
+from torchvision.transforms import RandomResizedCrop, Compose
 from torchvision.transforms.functional import resize
 from tqdm import tqdm
 
@@ -43,7 +43,7 @@ class MLFnetDataset(Dataset):
 
 class MultimonDataset(Dataset):
     def __init__(self, data_file, part_file, img_path, device=None, transforms=None,
-                 partition="train", data_format="raw", output_size=64):
+                 partition="train", output_size=64):
         if data_file is None or part_file is None or img_path is None:
             raise ValueError("data_file, part_file, and img_path must be specified")
 
@@ -51,9 +51,6 @@ class MultimonDataset(Dataset):
             raise ValueError("partition must be one of 'train', 'test', or 'val'")
         else:
             partition = ["train", "test", "val"].index(partition)
-
-        if data_format not in ["raw", "std", "norm"]:
-            data_format = "raw"
 
         if device is None:
             device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -68,7 +65,7 @@ class MultimonDataset(Dataset):
         self.partitions = self.parse_partitions(part_file, partition)
 
         # loads image key and targets
-        self.data = self.parse_datafile(data_file, data_format)
+        self.data = self.parse_datafile(data_file)
 
     def parse_partitions(self, part_file, partition):
         parts = read_csv(os.path.join(self.img_path, part_file))
@@ -80,7 +77,7 @@ class MultimonDataset(Dataset):
 
         type_counts = max(data["type1"].max(), data["type2"].max()) + 1
         gen_counts = data["gen"].max()
-        stats = [x + "_" + data_format for x in ["hp", "att", "def", "spatt", "spdef", "speed"]]
+        stats = ["hp", "att", "def", "spatt", "spdef", "speed"]
 
         filter = data["index"].isin(self.partitions)
         data = data[filter]
@@ -150,10 +147,10 @@ if __name__ == '__main__':
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')  # use GPU if CUDA is available
     print(device)
 
-    transforms = Compose([RandomResizedCrop(64), ToTensor()])
+    transforms = Compose([RandomResizedCrop(64)])
 
     random_data = MultimonDataset(data_file="data.csv", part_file="partitions.csv", img_path="./data/multimon/sprites",
-                                  device=device, transforms=None, partition="train")
+                                  device=device, transforms=transforms, partition="train")
 
     loader = DataLoader(random_data, batch_size=1, shuffle=True)
 
