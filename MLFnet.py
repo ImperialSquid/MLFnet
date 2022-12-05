@@ -29,6 +29,8 @@ class MLFnet(nn.Module, ModelMixin):
         self.finished = []  # any block that has subsequent blocks is "finished" and shouldn't be added to
 
         # store head dicts and set to Identity layer if non existent
+        if heads is None:
+            heads = dict()
         self.head_dicts = {t: heads.get(t, [{"type": "Identity"}]) for t in self.tasks}
         self.heads = nn.ModuleDict()  # stores instantiated heads (heads are reinstantiated when a layer is added)
         self.reset_heads()
