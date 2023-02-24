@@ -65,20 +65,16 @@ def get_context_parts(context, device, batch_size, transforms):
             return sum([p == l for p, l in zip(round(preds).tolist(), labels.tolist())])
 
     elif context == "multimon":
-        with open("data\\multimon\\type_weights.txt", "r") as f:
-            type_counts = {line.split(":")[0]: int(line.split(":")[1].strip()) for line in f}
-            type_indexes = {line.split(":")[0]: index for index, line in enumerate(type_counts)}
-
-        with open("data\\multimon\\gen_weights.txt", "r") as f:
-            gen_counts = {line.split(":")[0]: int(line.split(":")[1].strip()) for line in f}
-            gen_indexes = {line.split(":")[0]: index for index, line in enumerate(gen_counts)}
-
         train_dataset, test_dataset, valid_dataset = \
-            [MultimonDataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions[type_],
-                             type_dict=type_indexes, gen_dict=gen_indexes,
-                             img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
-                             transforms=transforms[type_])
-             for type_ in ["train", "test", "valid"]]
+            [MultimonDataset(data_file="data.csv", part_file="partitions.csv", img_path=".\\data\\multimon\\sprites",
+                             device=device, transforms=transforms[part], output_size=64, partition=part)
+             for part in ["train", "test", "valid"]]
+
+        gen_counts = train_dataset.gen_counts
+        type_counts = train_dataset.type_counts
+
+        gen_indexes = train_dataset.gen_indexes
+        type_indexes = train_dataset.type_indexes
 
         d1 = {"Type": [{"type": "Flatten"},
                        {"type": "LazyLinear", "out_features": len(type_counts)}],
