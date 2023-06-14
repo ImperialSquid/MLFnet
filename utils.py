@@ -40,9 +40,15 @@ def get_context_parts(context, batch_size, transforms):
                  "Rosy_Cheeks", "Sideburns", "Smiling", "Straight_Hair", "Wavy_Hair", "Wearing_Earrings",
                  "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", "Wearing_Necktie", "Young"][:3]
 
-        heads = {task: [{"type": "Flatten"},
-                        {"type": "LazyLinear", "out_features": 1},
-                        {"type": "Sigmoid"}] for task in tasks}
+        heads = {[{"type": "AdaptiveAvgPool2d", "output_size": (7, 7)},
+                  {"type": "Linear", "in_channels": 512 * 7 * 7, "out_channels": 4096},
+                  {"type": "ReLU", "in_place": True},
+                  {"type": "Dropout", "p": 0.5},
+                  {"type": "Linear", "in_channels": 4096, "out_channels": 4096},
+                  {"type": "ReLU", "in_place": True},
+                  {"type": "Dropout", "p": 0.5},
+                  {"type": "Linear", "in_channels": 4096, "out_channels": 1}]
+                 for task in tasks}
 
         losses = {task: BCELoss() for task in tasks}
 
