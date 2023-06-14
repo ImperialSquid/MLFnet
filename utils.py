@@ -52,9 +52,7 @@ def get_context_parts(context, batch_size, transforms):
 
         losses = {task: BCELoss() for task in tasks}
 
-        def get_accuracy(task, preds, labels):
-            # all celeba tasks are binary so we use the same test for all
-            return sum([p == l for p, l in zip(round(preds).tolist(), labels.tolist())])
+        metrics = {task: MetricCollection([BinaryAccuracy(), BinaryF1Score()]) for task in tasks}
     else:
         raise ValueError("Invalid context")
 
@@ -62,7 +60,7 @@ def get_context_parts(context, batch_size, transforms):
     test_dl = DataLoader(batch_size=batch_size, dataset=test_dataset, shuffle=True)
     valid_dl = DataLoader(batch_size=batch_size, dataset=valid_dataset, shuffle=True)
 
-    return train_dl, test_dl, valid_dl, heads, losses, get_accuracy
+    return train_dl, test_dl, valid_dl, heads, losses, metrics
 
 
 def get_backbone_layers(model="vgg13", device=None):
