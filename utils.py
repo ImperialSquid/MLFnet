@@ -1,10 +1,11 @@
-from statistics import mean
-
-from torch import round, tensor, topk
-from torch.nn import BCELoss, BCEWithLogitsLoss, MSELoss
+import torch
+from torch.hub import load
+from torch.nn import BCELoss
 from torch.utils.data import DataLoader
+from torchmetrics import MetricCollection
+from torchmetrics.classification import BinaryAccuracy, BinaryF1Score
 
-from dataset import CelebADataset, MultimonDataset
+from dataset import CelebADataset
 
 
 class ModelMixin:
