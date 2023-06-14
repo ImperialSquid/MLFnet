@@ -63,3 +63,34 @@ def get_context_parts(context, batch_size, transforms):
     valid_dl = DataLoader(batch_size=batch_size, dataset=valid_dataset, shuffle=True)
 
     return train_dl, test_dl, valid_dl, heads, losses, get_accuracy
+
+
+def get_backbone_layers(model="vgg13", device=None):
+    if device is None:
+        raise ValueError("Device must be specified")
+
+    backbone, blocks = None, None
+
+    if model == "vgg13":
+        model = load('pytorch/vision:v0.14.0', 'vgg13', weights="DEFAULT").to(device)
+        backbone = model.featurwe[0:5]
+        blocks = [model.features[5:10],
+                  model.features[10:15],
+                  model.features[15:20],
+                  model.features[20:25]]
+    elif model == "vgg19":
+        model = load('pytorch/vision:v0.14.0', 'vgg13', weights="DEFAULT").to(device)
+        backbone = model.featurwe[0:5]
+        blocks = [model.features[5:10],
+                  model.features[10:18],
+                  model.features[18:28],
+                  model.features[28:36]]
+
+    return backbone, blocks
+
+
+if __name__ == '__main__':
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+
+    get_context_parts("celeba", device=device)
