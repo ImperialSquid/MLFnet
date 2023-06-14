@@ -6,10 +6,10 @@ from matplotlib import pyplot as plt
 from pandas import read_csv
 from torch import zeros, tensor
 from torch.utils.data import Dataset, DataLoader
+from torchvision.datasets import CelebA
 from torchvision.io import read_image
 from torchvision.transforms import RandomResizedCrop, Compose
 from torchvision.transforms.functional import resize
-from tqdm import tqdm
 
 
 class MLFnetDataset(Dataset):
@@ -120,11 +120,10 @@ class MultimonDataset(Dataset):
         return image, labels
 
 
-class CelebADataset(MLFnetDataset):
-    def __init__(self, data_file, key_mask, img_path, device, no_mask=False, transforms=None,
-                 output_size=None, load_fraction=1):
-        # TODO add on the fly index masking to enable k fold
-        super().__init__(data_file, key_mask, img_path, device, no_mask, transforms, output_size)
+class CelebADataset(CelebA):
+    def __init__(self, root, split="train", transform=None, target_transform=None):
+        super().__init__(root=root, split=split, target_type="attr",
+                         transform=transform, target_transform=target_transform)
 
         self.tasks = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", "Bags_Under_Eyes", "Bald",
                       "Bangs", "Big_Lips", "Big_Nose", "Black_Hair", "Blond_Hair", "Blurry", "Brown_Hair",
@@ -134,26 +133,12 @@ class CelebADataset(MLFnetDataset):
                       "Rosy_Cheeks", "Sideburns", "Smiling", "Straight_Hair", "Wavy_Hair", "Wearing_Earrings",
                       "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", "Wearing_Necktie", "Young"]
 
-        self.no_mask = no_mask
-        key_mask = key_mask[:int(len(key_mask) * load_fraction)]
-        self.data = self.parse_datafile(data_file, key_mask)  # loads image key and targets
+    def __getitem__(self, index):
+        img, target = super().__getitem__(index)
 
-    def parse_datafile(self, data_path, key_filter, tqdm_on=True):
-        filter = dict.fromkeys(key_filter, True)  # using a filter dict saves iterating over the filters
-        data = dict()
-        with open(data_path) as file:
-            if tqdm_on:
-                lines = tqdm(file)
-                lines.set_description("Loading dataset... ")
-            else:
-                lines = file
+        target = {task: target[i] for i, task in enumerate(self.tasks)}
 
-            for line in lines:
-                splits = line.split(",")
-                if filter.get(splits[0], False) or self.no_mask:
-                    data[splits[0]] = {task: value.unsqueeze(0) for task, value in
-                                       zip(self.tasks, [tensor(int(s)).float() for s in splits[1:]])}
-        return data
+        return img, target
 
 
 if __name__ == '__main__':
