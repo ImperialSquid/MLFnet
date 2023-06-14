@@ -26,24 +26,10 @@ class ModelMixin:
         graph.save(filename, format=filetype)
 
 
-def get_context_parts(context, device, batch_size, transforms):
-    partitions = {"train": [], "test": [], "valid": []}
-    with open(f"./data/{context}/partitions.txt") as f:
-        for line in f.readlines():
-            if line.split(",")[1].strip() == "0":
-                partitions["train"].append(line.split(",")[0])
-            elif line.split(",")[1].strip() == "1":
-                partitions["valid"].append(line.split(",")[0])
-            elif line.split(",")[1].strip() == "2":
-                partitions["test"].append(line.split(",")[0])
-
+def get_context_parts(context, batch_size, transforms):
     if context == "celeba":
-        load_fraction = 0.1
-
         train_dataset, test_dataset, valid_dataset = \
-            [CelebADataset(data_file=f".\\data\\{context}\\labels.txt", key_mask=partitions[type_],
-                           img_path=f".\\data\\{context}\\data", device=device, no_mask=False,
-                           transforms=transforms[type_], load_fraction=load_fraction)
+            [CelebADataset("./data/celeba", split=type_, transform=transforms, target_transform=None)
              for type_ in ["train", "test", "valid"]]
 
         tasks = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", "Bags_Under_Eyes", "Bald",
