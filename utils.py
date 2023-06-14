@@ -49,47 +49,6 @@ def get_context_parts(context, batch_size, transforms):
         def get_accuracy(task, preds, labels):
             # all celeba tasks are binary so we use the same test for all
             return sum([p == l for p, l in zip(round(preds).tolist(), labels.tolist())])
-
-    elif context == "multimon":
-        train_dataset, test_dataset, valid_dataset = \
-            [MultimonDataset(data_file="data.csv", part_file="partitions.csv", img_path=".\\data\\multimon\\sprites",
-                             device=device, transforms=transforms[part], output_size=64, partition=part)
-             for part in ["train", "test", "valid"]]
-
-        gen_counts = train_dataset.gen_counts
-        type_counts = train_dataset.type_counts
-
-        gen_indexes = train_dataset.gen_indexes
-        type_indexes = train_dataset.type_indexes
-
-        d1 = {"Type": [{"type": "Flatten"},
-                       {"type": "LazyLinear", "out_features": len(type_counts)}],
-              "Gen": [{"type": "Flatten"},
-                      {"type": "LazyLinear", "out_features": len(gen_counts)}]}
-        d2 = {task.title(): [{"type": "Flatten"},
-                             {"type": "LazyLinear", "out_features": 1}]
-              for task in ["hp", "att", "def", "spatt", "spdef", "speed", "height", "weight"]}
-        heads = {**d1, **d2}
-
-        d1 = {"Type": BCEWithLogitsLoss(pos_weight=tensor([type_counts[t] / sum(type_counts.values())
-                                                           for t in type_counts])).to(device),
-              "Gen": BCEWithLogitsLoss(pos_weight=tensor([gen_counts[g] / sum(gen_counts.values())
-                                                          for g in gen_counts])).to(device)}
-        d2 = {task.title(): MSELoss().to(device)
-              for task in ["hp", "att", "def", "spatt", "spdef", "speed", "height", "weight"]}
-        losses = {**d1, **d2}
-
-        def get_accuracy(task, preds, labels):
-            if task == "Type":  # sum of predictions where at least one is correct
-                return sum([sum(x in p_ind for x in l_ind) > 0 for p_ind, l_ind in
-                            zip(topk(preds, dim=1, k=2).indices.tolist(),
-                                topk(labels, dim=1, k=2).indices.tolist())])
-            elif task == "Gen":  # sum of predictions where gen is correct
-                return sum([p_ind == l_ind for p_ind, l_ind in
-                            zip(topk(preds, dim=1, k=1).indices.tolist(),
-                                topk(labels, dim=1, k=1).indices.tolist())])
-            else:  # MSE since accuracy is not a simple metric for regression tasks
-                return mean([(p - l) ** 2 for p, l in zip(round(preds).tolist(), labels.tolist())])
     else:
         raise ValueError("Invalid context")
 
