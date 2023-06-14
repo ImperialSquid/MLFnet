@@ -71,15 +71,15 @@ def get_backbone_layers(model="vgg13", device=None):
     backbone, blocks = None, None
 
     if model == "vgg13":
-        model = load('pytorch/vision:v0.14.0', 'vgg13', weights="DEFAULT").to(device)
-        backbone = model.featurwe[0:5]
+        model = load('pytorch/vision:v0.14.0', 'vgg13', weights="DEFAULT")
+        backbone = model.features[0:5]
         blocks = [model.features[5:10],
                   model.features[10:15],
                   model.features[15:20],
                   model.features[20:25]]
     elif model == "vgg19":
-        model = load('pytorch/vision:v0.14.0', 'vgg13', weights="DEFAULT").to(device)
-        backbone = model.featurwe[0:5]
+        model = load('pytorch/vision:v0.14.0', 'vgg19', weights="DEFAULT")
+        backbone = model.features[0:5]
         blocks = [model.features[5:10],
                   model.features[10:18],
                   model.features[18:28],
