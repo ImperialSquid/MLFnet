@@ -7,7 +7,7 @@ from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, Comp
     CenterCrop
 
 from MLFnet import MLFnet
-from utils import get_context_parts
+from utils import get_context_parts, get_backbone_layers
 
 
 def main():
@@ -28,13 +28,9 @@ def main():
     train_dl, test_dl, valid_dl, heads, losses, get_acc = \
         get_context_parts(context, device, batch_size, transforms)
 
-    backbone = torch.hub.load('pytorch/vision:v0.10.0', 'vgg11', pretrained=True)
+    backbone, layers = get_backbone_layers()
 
-    layers = [{"type": "Linear", "in_channels": 3, "out_channels": 6}]
-
-    model = MLFnet(tasks=tuple(heads.keys()), heads=heads, device=device, backbone=None)
-    model.add_layer(None, type="Flatten")
-    model.add_layer(None, **layers.pop(0))
+    model = MLFnet(tasks=tuple(heads.keys()), heads=heads, backbone=backbone, device=device)
 
     optimiser = optim.SGD(model.parameters(), lr=0.1, momentum=0.9)
     scheduler = lr_scheduler.ExponentialLR(optimiser, gamma=0.25, verbose=True)
