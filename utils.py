@@ -31,7 +31,7 @@ class ModelMixin:
 def get_context_parts(context, batch_size, transforms):
     if context == "celeba":
         train_dataset, test_dataset, valid_dataset = \
-            [CelebADataset("./data/celeba", split=type_, transform=transforms, target_transform=None)
+            [CelebADataset("./data/celeba", split=type_, transform=transforms[type_], target_transform=None)
              for type_ in ["train", "test", "valid"]]
 
         tasks = ["5_o_Clock_Shadow", "Arched_Eyebrows", "Attractive", "Bags_Under_Eyes", "Bald",
@@ -44,10 +44,10 @@ def get_context_parts(context, batch_size, transforms):
 
         heads = {task: [{"type": "AdaptiveAvgPool2d", "output_size": (7, 7)},
                         {"type": "Linear", "in_features": 512 * 7 * 7, "out_features": 4096},
-                        {"type": "ReLU", "in_place": True},
+                        {"type": "ReLU", "inplace": True},
                         {"type": "Dropout", "p": 0.5},
                         {"type": "Linear", "in_features": 4096, "out_features": 4096},
-                        {"type": "ReLU", "in_place": True},
+                        {"type": "ReLU", "inplace": True},
                         {"type": "Dropout", "p": 0.5},
                         {"type": "Linear", "in_features": 4096, "out_features": 1}]
                  for task in tasks}
