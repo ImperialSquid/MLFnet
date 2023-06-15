@@ -36,18 +36,11 @@ def main():
 
     epochs = len(layers) * 3
 
-    out_para = ("Epoch {epoch}/{epochs}\n" +
-                "\n".join([f"{phase.title():7} -- \t" +
-                           " | ".join([f"{task.title()}:{{{phase}-{task}:.4%}}"
-                                       for task in model.tasks])
-                           for phase in ["train", "test"]]))
-
     out_file = f"stats\\data-{context}-{dt.now().strftime('%Y-%m-%d-%H-%M-%S')}.csv"
     with open(out_file, "w") as f:
         f.write("epoch,batch,task,task_id,param_id,param_value\n")
 
     for epoch in range(epochs):
-        stats = {f"{phase}-{task}": list([0, 0]) for task in model.tasks for phase in ["train", "test"]}
         if epoch % 2 == 0 and epoch > 0:
             model.freeze_model()
             new_layers = model.add_layer(None, **layers.pop(0))
@@ -96,19 +89,17 @@ def main():
                             for g_id, grad in enumerate(grads[task]):
                                 f.write(f"{epoch},{b_id},{task},{t_id},{g_id},{grad}\n")
 
-                # ACCURACY
                 if phase in ["train", "test"]:
                     for task in model.tasks:
-                        acc = get_acc(task=task, preds=preds[task], labels=labels[task])
-                        batch_size = preds[task].size()[0]
-                        stats[phase + "-" + task][0] += acc
-                        stats[phase + "-" + task][1] += batch_size
+                        metrics[phase][task].update(preds[task], labels[task])
 
-        for task in stats:
-            stats[task] = stats[task][0] / stats[task][1]
-
-        # Print results per epoch
-        print(out_para.format(epoch=epoch + 1, epochs=epochs, **stats))
+        # report metrics
+        print(f"Epoch {epoch + 1}/{epochs}")
+        for phase in ["train", "test"]:
+            print(f"  {phase}:")
+            for task in model.tasks:
+                print(f"    {task}: {metrics[phase][task]}")
+                metrics[phase][task].reset()
 
 
 if __name__ == "__main__":
