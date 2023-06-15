@@ -40,7 +40,7 @@ def get_context_parts(context, batch_size, transforms):
                  "Heavy_Makeup", "High_Cheekbones", "Male", "Mouth_Slightly_Open", "Mustache",
                  "Narrow_Eyes", "No_Beard", "Oval_Face", "Pale_Skin", "Pointy_Nose", "Receding_Hairline",
                  "Rosy_Cheeks", "Sideburns", "Smiling", "Straight_Hair", "Wavy_Hair", "Wearing_Earrings",
-                 "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", "Wearing_Necktie", "Young"][:3]
+                 "Wearing_Hat", "Wearing_Lipstick", "Wearing_Necklace", "Wearing_Necktie", "Young"]
 
         heads = {[{"type": "AdaptiveAvgPool2d", "output_size": (7, 7)},
                   {"type": "Linear", "in_channels": 512 * 7 * 7, "out_channels": 4096},
