@@ -18,12 +18,12 @@ def main():
     context = "celeba"
     base_model_name = "VGG13"
 
-    w = load("pytorch/vision:v0.14.0", "get_model_weights", name=base_model_name)
-    base_transforms = w.transforms
+    w = load("pytorch/vision:v0.14.0", "get_model_weights", name=base_model_name)["DEFAULT"]
+    model_specific_transforms = w.transforms()
     transforms = {
-        'train': Compose([RandomResizedCrop(224), RandomHorizontalFlip(), base_transforms]),
-        'test': base_transforms,
-        'valid': base_transforms
+        'train': Compose([RandomResizedCrop(224), RandomHorizontalFlip(), model_specific_transforms]),
+        'test': model_specific_transforms,
+        'valid': model_specific_transforms
     }
     train_dl, test_dl, valid_dl, heads, losses, metrics = get_context_parts(context, batch_size, transforms)
 
