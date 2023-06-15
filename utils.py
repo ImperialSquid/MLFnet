@@ -54,7 +54,8 @@ def get_context_parts(context, batch_size, transforms):
 
         losses = {task: BCELoss() for task in tasks}
 
-        metrics = {task: MetricCollection([BinaryAccuracy(), BinaryF1Score()]) for task in tasks}
+        metrics = {phase: {task: MetricCollection([BinaryAccuracy(), BinaryF1Score()])
+                           for task in tasks} for phase in ["train", "test"]}
     else:
         raise ValueError("Invalid context")
 
