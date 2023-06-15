@@ -2,9 +2,9 @@ from datetime import datetime as dt
 
 import torch
 from torch import optim
+from torch.hub import load
 from torch.optim import lr_scheduler
-from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, Compose, ToTensor, Normalize, Resize, \
-    CenterCrop
+from torchvision.transforms import RandomResizedCrop, RandomHorizontalFlip, Compose
 
 from MLFnet import MLFnet
 from utils import get_context_parts, get_backbone_layers
@@ -16,17 +16,16 @@ def main():
 
     batch_size = 16
     context = "celeba"
-    input_size = 256
+    base_model_name = "VGG13"
+
+    w = load("pytorch/vision:v0.14.0", "get_model_weights", name=base_model_name)
+    base_transforms = w.transforms
     transforms = {
-        'train': Compose([RandomResizedCrop(input_size), RandomHorizontalFlip(),  # slight randomness for training
-                          ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
-        'test': Compose([Resize(input_size), CenterCrop(input_size),  # no randomness for testing
-                         ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
-        'valid': Compose([Resize(input_size), CenterCrop(input_size),  # no randomness for validation
-                          ToTensor(), Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])]),
+        'train': Compose([RandomResizedCrop(224), RandomHorizontalFlip(), base_transforms]),
+        'test': base_transforms,
+        'valid': base_transforms
     }
-    train_dl, test_dl, valid_dl, heads, losses, get_acc = \
-        get_context_parts(context, device, batch_size, transforms)
+    train_dl, test_dl, valid_dl, heads, losses, metrics = get_context_parts(context, batch_size, transforms)
 
     backbone, layers = get_backbone_layers()
 
